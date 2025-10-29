@@ -101,3 +101,4 @@ However, there may be some specific cases where adjustments are necessary. We re
 - Now, you can access the container's shell and install [Bagisto](https://github.com/bagisto/bagisto).
 
 In case of any issues or queries, raise your ticket at [Webkul Support](https://webkul.uvdesk.com/en/customer/create-ticket/).
+# bagisto
