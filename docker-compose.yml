@@ -123,16 +123,6 @@ services:
     depends_on:
       - nginx
 
-  loki:
-    image: grafana/loki:latest
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./.configs/data/loki-data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - default
-
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -162,12 +152,22 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+  loki:
+      image: grafana/loki:3.0.0                   
+      container_name: loki                          
+      volumes:
+        - ./.configs/loki-config-official.yaml:/mnt/config/loki-config.yaml 
+        - ./.configs/data/loki-data:/tmp
+      ports:
+        - "3100:3100"                              
+      command: -config.file=/mnt/config/loki-config.yaml 
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.0.0                  
+    container_name: promtail                    
     volumes:
-      - ./workspace/:/var/log/app
-      - ./.configs/promtail-config.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
+      - ./.configs/promtail-config-official.yaml:/mnt/config/promtail-config.yaml 
+      - ./workspace:/var/log/app                           
     depends_on:
-      - loki
+      - loki                                      
+    command: -config.file=/mnt/config/promtail-config.yaml 
