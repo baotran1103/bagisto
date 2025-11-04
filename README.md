@@ -10,6 +10,10 @@ The primary purpose of this repository is to provide a workspace along with all 
 - Elasticsearch
 - Kibana
 - Mailpit
+- **PostgreSQL** (for SonarQube)
+- **SonarQube** (Code Quality & Security Analysis)
+- **Prometheus + Grafana** (Monitoring & Metrics)
+- **Loki + Promtail** (Log Aggregation)
 
 ## Supported Bagisto Version
 
@@ -83,6 +87,37 @@ However, there may be some specific cases where adjustments are necessary. We re
   ```text
   http(s):/your_server_endpoint/customer/register
   ```
+
+## SonarQube Code Analysis
+
+- To access SonarQube for code quality analysis:
+
+  ```text
+  http://localhost:9000
+  
+  Default credentials:
+  Username: admin
+  Password: admin
+  ```
+
+- Run code analysis:
+
+  ```sh
+  # Make script executable
+  chmod +x sonarqube-scan.sh
+  
+  # Run analysis
+  ./sonarqube-scan.sh
+  ```
+
+- For detailed SonarQube setup and usage, see [SONARQUBE_GUIDE.md](./SONARQUBE_GUIDE.md)
+
+## Monitoring & Observability
+
+- **Grafana Dashboard**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **PHPMyAdmin**: http://localhost:8080
+- **Mailpit**: http://localhost:8025
 
 ## Already Docker Expert?
 

@@ -30,8 +30,8 @@ services:
       - 3306:3306
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_ROOT_HOST: "%"
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./.configs/data/mysql-data:/var/lib/mysql/
       - ./workspace/:/var/www/html/
@@ -41,12 +41,12 @@ services:
     ports:
       - 8080:80
     environment:
-      PMA_HOST: mysql
-      PMA_USER: root
-      PMA_PASSWORD: root
-      UPLOAD_LIMIT: 2G
-      MEMORY_LIMIT: 2G
-      MAX_EXECUTION_TIME: 600
+      PMA_HOST: ${PMA_HOST}
+      PMA_USER: ${PMA_USER}
+      PMA_PASSWORD: ${PMA_PASSWORD}
+      UPLOAD_LIMIT: ${PMA_UPLOAD_LIMIT}
+      MEMORY_LIMIT: ${PMA_MEMORY_LIMIT}
+      MAX_EXECUTION_TIME: ${PMA_MAX_EXECUTION_TIME}
 
   redis:
     image: redis:6.2-alpine
@@ -56,34 +56,34 @@ services:
     volumes:
       - ./.configs/data/redis-data:/data
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
-    ports:
-      - 9200:9200
-      - 9300:9300
-    environment:
-      - xpack.security.enabled=false
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - ./.configs/data/elasticsearch-data:/var/lib/elasticsearch/data
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+  #   ports:
+  #     - 9200:9200
+  #     - 9300:9300
+  #   environment:
+  #     - xpack.security.enabled=false
+  #     - discovery.type=single-node
+  #     - bootstrap.memory_lock=true
+  #     - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #     nofile:
+  #       soft: 65536
+  #       hard: 65536
+  #   volumes:
+  #     - ./.configs/data/elasticsearch-data:/var/lib/elasticsearch/data
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.0
-    ports:
-      - 5601:5601
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      - elasticsearch
+  # kibana:
+  #   image: docker.elastic.co/kibana/kibana:7.17.0
+  #   ports:
+  #     - 5601:5601
+  #   environment:
+  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  #   depends_on:
+  #     - elasticsearch
 
   mailpit:
     image: "axllent/mailpit:latest"
@@ -110,7 +110,7 @@ services:
     ports:
       - "9104:9104"
     environment:
-      - DATA_SOURCE_NAME=root:root@tcp(mysql:3306)/mysql
+      - DATA_SOURCE_NAME=${MYSQL_EXPORTER_DATA_SOURCE_NAME}
     depends_on:
       - mysql
 
@@ -149,7 +149,7 @@ services:
     volumes:
       - ./.configs/data/grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     depends_on:
       - prometheus
   loki:
@@ -170,4 +170,52 @@ services:
       - ./workspace:/var/log/app                           
     depends_on:
       - loki                                      
-    command: -config.file=/mnt/config/promtail-config.yaml 
+    command: -config.file=/mnt/config/promtail-config.yaml
+
+  sonarqube-db:
+    image: postgres:15-alpine
+    container_name: sonarqube-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${SONAR_DB_USER}
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
+      POSTGRES_DB: ${SONAR_DB_NAME}
+    volumes:
+      - ./.configs/data/sonarqube-postgres-data:/var/lib/postgresql/data
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: ${SONAR_JDBC_URL}
+      SONAR_JDBC_USERNAME: ${SONAR_DB_USER}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: ${SONAR_ES_BOOTSTRAP_CHECKS_DISABLE}
+    volumes:
+      - ./.configs/data/sonarqube-data:/opt/sonarqube/data
+      - ./.configs/data/sonarqube-extensions:/opt/sonarqube/extensions
+      - ./.configs/data/sonarqube-logs:/opt/sonarqube/logs
+    depends_on:
+      - sonarqube-db
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  sonar-scanner:
+    image: sonarsource/sonar-scanner-cli:11.5.0.2154_7.3.0
+    container_name: sonar-scanner
+    volumes:
+      - ./workspace:/usr/src
+    working_dir: /usr/src
+    environment:
+      SONAR_HOST_URL: ${SONAR_HOST_URL}
+      SONAR_TOKEN: ${SONAR_TOKEN}
+    depends_on:
+      - sonarqube
+    command: ["sonar-scanner"]
+    stdin_open: true
+    tty: true
