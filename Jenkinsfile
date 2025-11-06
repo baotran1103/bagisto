@@ -3,7 +3,6 @@ pipeline {
         docker {
             image 'php:8.3-fpm'
             args '''
-                -v $HOME/.composer:/root/.composer
                 -v /var/run/docker.sock:/var/run/docker.sock
                 --network bagisto-docker_default
                 -u root
