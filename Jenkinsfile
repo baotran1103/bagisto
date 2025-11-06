@@ -47,6 +47,30 @@ pipeline {
                     composer --version
                     node --version
                     npm --version
+                    
+                    # Show current directory
+                    pwd
+                    ls -la
+                '''
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                echo '=== Setting up .env file ==='
+                sh '''
+                    # Check if composer.json exists
+                    if [ ! -f composer.json ]; then
+                        echo "ERROR: composer.json not found in $(pwd)"
+                        exit 1
+                    fi
+                    
+                    # Create .env if it doesn't exist
+                    if [ ! -f .env ]; then
+                        cp .env.example .env 2>/dev/null || echo "APP_ENV=testing" > .env
+                    fi
+                    
+                    echo "✓ Environment setup complete"
                 '''
             }
         }
