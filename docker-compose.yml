@@ -247,11 +247,18 @@ services:
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
+    user: root  # Run as root to access docker socket
     ports:
       - "8081:8080"
+      - "50000:50000"  # JNLP port for agents
     volumes:
       - ./.configs/data/jenkins-data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/local/bin/docker:/usr/bin/docker  # Mount docker CLI
+      - ./workspace:/var/jenkins_workspace:rw  # Access to workspace
     environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.LAUNCH_DIAGNOSTICS=true
+      - DOCKER_HOST=unix:///var/run/docker.sock
     restart: unless-stopped
+    networks:
+      - default
