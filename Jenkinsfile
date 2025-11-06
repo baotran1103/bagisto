@@ -59,8 +59,8 @@ EOF
                 stage('Backend Dependencies') {
                     agent {
                         docker {
-                            image 'composer:2.7'
-                            args '-v composer-cache:/tmp/composer-cache -e COMPOSER_CACHE_DIR=/tmp/composer-cache'
+                            image 'php-fpm:latest'
+                            args '-v composer-cache:/tmp/composer-cache -e COMPOSER_CACHE_DIR=/tmp/composer-cache -u root'
                         }
                     }
                     steps {
@@ -79,8 +79,8 @@ EOF
                 stage('Frontend Dependencies & Build') {
                     agent {
                         docker {
-                            image 'node:20-alpine'
-                            args '-v npm-cache:/root/.npm'
+                            image 'php-fpm:latest'
+                            args '-v npm-cache:/root/.npm -u root'
                         }
                     }
                     steps {
@@ -88,7 +88,7 @@ EOF
                         dir('bagisto-app') {
                             sh '''
                                 echo "=== Installing NPM Dependencies ==="
-                                npm ci --quiet
+                                npm install --quiet
                                 
                                 echo "=== Building Frontend Assets ==="
                                 npm run build
@@ -107,7 +107,7 @@ EOF
                 stage('PHPUnit Tests') {
                     agent {
                         docker {
-                            image 'php:8.3-fpm'
+                            image 'php-fpm:latest'
                             args """
                                 --network ${DOCKER_NETWORK}
                                 -u root
@@ -119,12 +119,6 @@ EOF
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
-                                echo "=== Installing PHP Extensions ==="
-                                apt-get update -qq
-                                apt-get install -y -qq libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libicu-dev
-                                docker-php-ext-configure gd --with-freetype --with-jpeg
-                                docker-php-ext-install pdo pdo_mysql zip gd calendar intl
-                                
                                 echo "=== Generating Application Key ==="
                                 php artisan key:generate --force
                                 
@@ -167,7 +161,10 @@ EOF
                     stages {
                         stage('Composer Audit') {
                             agent {
-                                docker { image 'composer:2.7' }
+                                docker { 
+                                    image 'php-fpm:latest'
+                                    args '-u root'
+                                }
                             }
                             steps {
                                 unstash 'configured-source'
@@ -183,7 +180,10 @@ EOF
                         
                         stage('NPM Audit') {
                             agent {
-                                docker { image 'node:20-alpine' }
+                                docker { 
+                                    image 'php-fpm:latest'
+                                    args '-u root'
+                                }
                             }
                             steps {
                                 unstash 'configured-source'
@@ -204,7 +204,7 @@ EOF
         stage('Optimize Application') {
             agent {
                 docker {
-                    image 'php:8.3-fpm'
+                    image 'php-fpm:latest'
                     args '-u root'
                 }
             }
@@ -213,11 +213,6 @@ EOF
                 unstash 'backend-deps'
                 dir('bagisto-app') {
                     sh '''
-                        echo "=== Installing PHP Extensions ==="
-                        apt-get update -qq
-                        apt-get install -y -qq libzip-dev libpng-dev
-                        docker-php-ext-install pdo zip
-                        
                         echo "=== Optimizing Laravel ==="
                         php artisan config:cache
                         php artisan route:cache
