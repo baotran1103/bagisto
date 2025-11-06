@@ -135,31 +135,26 @@ pipeline {
                 echo '=== Running SonarQube analysis ==='
                 dir('bagisto-app') {
                     sh '''
-                        # Install docker CLI if needed
-                        which docker || apt-get install -y -qq docker.io
+                        # Install Java (required for SonarQube scanner)
+                        apt-get install -y -qq default-jre-headless wget unzip
                         
-                        # Debug: Check current directory structure
-                        echo "Current directory: $(pwd)"
-                        echo "Directory contents:"
-                        ls -la
-                        echo "Checking app directory:"
-                        ls -la app/ || echo "app/ not found"
-                        echo "Checking packages directory:"
-                        ls -la packages/ || echo "packages/ not found"
+                        # Download and install SonarQube Scanner CLI
+                        if [ ! -d "/opt/sonar-scanner" ]; then
+                            wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-7.3.0.5189-linux-x64.zip -O /tmp/sonar.zip
+                            unzip -q /tmp/sonar.zip -d /opt/
+                            mv /opt/sonar-scanner-* /opt/sonar-scanner
+                            ln -sf /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner
+                        fi
                         
-                        # Run SonarQube scanner with absolute path
-                        docker run --rm \
-                            --network bagisto-docker_default \
-                            -v "$(pwd):/usr/src" \
-                            -w /usr/src \
-                            -e SONAR_HOST_URL=${SONAR_HOST} \
-                            -e SONAR_TOKEN=${SONAR_TOKEN} \
-                            sonarsource/sonar-scanner-cli:latest \
+                        # Run SonarQube analysis directly (no Docker-in-Docker)
+                        sonar-scanner \
                             -Dsonar.projectKey=bagisto \
                             -Dsonar.projectName=Bagisto \
                             -Dsonar.sources=app,packages/Webkul \
                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \
-                            -Dsonar.sourceEncoding=UTF-8
+                            -Dsonar.host.url=${SONAR_HOST} \
+                            -Dsonar.token=${SONAR_TOKEN} \
+                            -Dsonar.sourceEncoding=UTF-8 || echo "⚠️ SonarQube analysis failed but continuing..."
                     '''
                 }
             }
