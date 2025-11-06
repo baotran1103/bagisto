@@ -6,11 +6,9 @@ pipeline {
                 -v composer-cache:/root/.composer
                 -v npm-cache:/root/.npm
                 -v /var/run/docker.sock:/var/run/docker.sock
-                -v jenkins-data:/var/jenkins_home
                 --network bagisto-docker_default
                 -u root
             '''
-            reuseNode true
         }
     }
     
@@ -24,13 +22,6 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
-            steps {
-                echo '=== Checking out code from GitHub ==='
-                checkout scm
-            }
-        }
-        
         stage('Install System Dependencies') {
             steps {
                 echo '=== Installing Node.js and system tools ==='
