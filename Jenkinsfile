@@ -40,11 +40,11 @@ pipeline {
                 echo '=== Installing Node.js and system tools ==='
                 sh '''
                     apt-get update -qq
-                    apt-get install -y -qq nodejs npm git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev curl
+                    apt-get install -y -qq nodejs npm git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libicu-dev curl
                     
-                    # Install PHP extensions
+                    # Install PHP extensions (including calendar and intl for Bagisto)
                     docker-php-ext-configure gd --with-freetype --with-jpeg
-                    docker-php-ext-install pdo pdo_mysql zip gd
+                    docker-php-ext-install pdo pdo_mysql zip gd calendar intl
                     
                     # Install Composer
                     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -54,6 +54,8 @@ pipeline {
                     echo "✓ Composer: $(composer --version)"
                     echo "✓ Node: $(node --version)"
                     echo "✓ NPM: $(npm --version)"
+                    echo "✓ PHP Extensions:"
+                    php -m | grep -E "(calendar|intl|gd|zip|pdo_mysql)"
                     echo "✓ Working directory: $(pwd)"
                     echo "✓ Files in workspace:"
                     ls -la
