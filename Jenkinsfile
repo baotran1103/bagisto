@@ -74,21 +74,28 @@ pipeline {
                             exit 1
                         fi
                         
-                        # Create .env with proper database connection
+                        # Create .env from example
                         cp .env.example .env
                         
-                        # Configure database connection to docker-compose MySQL
-                        sed -i 's/DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
-                        sed -i 's/DB_DATABASE=bagisto/DB_DATABASE=bagisto/' .env
-                        sed -i 's/DB_USERNAME=root/DB_USERNAME=root/' .env
-                        sed -i 's/DB_PASSWORD=/DB_PASSWORD=root/' .env
+                        # Configure database connection using direct assignment
+                        # (sed doesn't work when values are empty in .env.example)
+                        cat >> .env << 'EOF'
+
+# Override database settings for CI/CD
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=bagisto_testing
+DB_USERNAME=root
+DB_PASSWORD=root
+
+# Testing environment
+APP_ENV=testing
+APP_DEBUG=false
+EOF
                         
-                        # Configure for testing
-                        sed -i 's/APP_ENV=local/APP_ENV=testing/' .env
-                        sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
-                        
-                        echo "✓ Created .env with database connection to mysql container"
-                        echo "✓ DB_HOST=mysql (docker-compose service)"
+                        echo "✓ Created .env with database connection"
+                        echo "✓ Database config:"
+                        grep "^DB_" .env | grep -v "PASSWORD"
                     '''
                 }
             }
