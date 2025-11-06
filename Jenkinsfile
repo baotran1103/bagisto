@@ -138,18 +138,27 @@ pipeline {
                         # Install docker CLI if needed
                         which docker || apt-get install -y -qq docker.io
                         
-                        # Run SonarQube scanner from within the app directory
+                        # Debug: Check current directory structure
+                        echo "Current directory: $(pwd)"
+                        echo "Directory contents:"
+                        ls -la
+                        echo "Checking app directory:"
+                        ls -la app/ || echo "app/ not found"
+                        echo "Checking packages directory:"
+                        ls -la packages/ || echo "packages/ not found"
+                        
+                        # Run SonarQube scanner with absolute path
                         docker run --rm \
                             --network bagisto-docker_default \
-                            -v $(pwd):/usr/src \
+                            -v "$(pwd):/usr/src" \
                             -w /usr/src \
                             -e SONAR_HOST_URL=${SONAR_HOST} \
                             -e SONAR_TOKEN=${SONAR_TOKEN} \
                             sonarsource/sonar-scanner-cli:latest \
                             -Dsonar.projectKey=bagisto \
                             -Dsonar.projectName=Bagisto \
-                            -Dsonar.sources=app,packages \
-                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/** \
+                            -Dsonar.sources=app,packages/Webkul \
+                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \
                             -Dsonar.sourceEncoding=UTF-8
                     '''
                 }
