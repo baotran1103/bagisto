@@ -209,7 +209,7 @@ services:
     image: sonarsource/sonar-scanner-cli:11.5.0.2154_7.3.0
     container_name: sonar-scanner
     volumes:
-      - ./workspace:/usr/src
+      - /Users/baotran/Documents/Rivercrane/training-management-system:/usr/src
     working_dir: /usr/src
     environment:
       SONAR_HOST_URL: ${SONAR_HOST_URL}
@@ -219,3 +219,39 @@ services:
     command: ["sonar-scanner"]
     stdin_open: true
     tty: true
+
+  clamav:
+    image: clamav/clamav:latest
+    container_name: clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - ./.configs/data/clamav-data:/var/lib/clamav
+      - ./workspace:/scan/workspace:ro
+      # - /Users/baotran/Documents/Rivercrane/training-management-system:/scan/training:ro
+    environment:
+      - CLAMAV_NO_FRESHCLAMD=false
+      - CLAMAV_NO_CLAMD=false
+    restart: unless-stopped
+
+  clamav-scan:
+    image: clamav/clamav:latest
+    container_name: clamav-scan
+    volumes:
+      - ./workspace:/scan/workspace:ro
+      - /Users/baotran/Documents/Rivercrane/training-management-system:/scan/training:ro
+    command: ["clamscan", "--recursive", "--infected", "/scan"]
+    profiles:
+      - scan
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./.configs/data/jenkins-data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    restart: unless-stopped
