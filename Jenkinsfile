@@ -84,6 +84,32 @@ pipeline {
         }
     }
 
+    stage('Deploy to Local') {
+        steps {
+            echo '=== Deploying to local container ==='
+            script {
+                // Copy built files to running container
+                sh '''
+                    # Stop current container
+                    docker-compose stop php-fpm
+                    
+                    # Copy new code
+                    docker cp ${WORKSPACE}/. php-fpm:${PROJECT_DIR}
+                    
+                    # Run migrations
+                    docker-compose exec -T php-fpm php artisan migrate --force
+                    
+                    # Clear cache
+                    docker-compose exec -T php-fpm php artisan cache:clear
+                    docker-compose exec -T php-fpm php artisan config:clear
+                    docker-compose exec -T php-fpm php artisan route:clear
+                    
+                    # Start container
+                    docker-compose start php-fpm
+                '''
+            }
+        }
+    }
     post {
         always {
             echo '=== Cleaning up workspace ==='
