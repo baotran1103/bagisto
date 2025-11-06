@@ -74,16 +74,21 @@ pipeline {
                             exit 1
                         fi
                         
-                        # Create .env if needed
-                        if [ ! -f .env ]; then
-                            if [ -f .env.example ]; then
-                                cp .env.example .env
-                                echo "✓ Created .env from .env.example"
-                            else
-                                echo "APP_ENV=testing" > .env
-                                echo "✓ Created minimal .env"
-                            fi
-                        fi
+                        # Create .env with proper database connection
+                        cp .env.example .env
+                        
+                        # Configure database connection to docker-compose MySQL
+                        sed -i 's/DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
+                        sed -i 's/DB_DATABASE=bagisto/DB_DATABASE=bagisto/' .env
+                        sed -i 's/DB_USERNAME=root/DB_USERNAME=root/' .env
+                        sed -i 's/DB_PASSWORD=/DB_PASSWORD=root/' .env
+                        
+                        # Configure for testing
+                        sed -i 's/APP_ENV=local/APP_ENV=testing/' .env
+                        sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
+                        
+                        echo "✓ Created .env with database connection to mysql container"
+                        echo "✓ DB_HOST=mysql (docker-compose service)"
                     '''
                 }
             }
@@ -112,7 +117,14 @@ pipeline {
                 echo '=== Running PHPUnit tests ==='
                 dir('bagisto-app') {
                     sh '''
-                        php artisan test || echo "⚠ Some tests failed but continuing..."
+                        # Generate app key for Laravel
+                        php artisan key:generate --force
+                        
+                        # Run migrations in testing environment
+                        php artisan migrate --force --env=testing || echo "⚠️ Migration failed"
+                        
+                        # Run tests
+                        php artisan test || echo "⚠️ Some tests failed but continuing..."
                     '''
                 }
             }
@@ -126,16 +138,19 @@ pipeline {
                         # Install docker CLI if needed
                         which docker || apt-get install -y -qq docker.io
                         
+                        # Run SonarQube scanner from within the app directory
                         docker run --rm \
                             --network bagisto-docker_default \
-                            -v ${WORKSPACE}/bagisto-app:/usr/src \
+                            -v $(pwd):/usr/src \
+                            -w /usr/src \
                             -e SONAR_HOST_URL=${SONAR_HOST} \
                             -e SONAR_TOKEN=${SONAR_TOKEN} \
                             sonarsource/sonar-scanner-cli:latest \
                             -Dsonar.projectKey=bagisto \
                             -Dsonar.projectName=Bagisto \
                             -Dsonar.sources=app,packages \
-                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**
+                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/** \
+                            -Dsonar.sourceEncoding=UTF-8
                     '''
                 }
             }
