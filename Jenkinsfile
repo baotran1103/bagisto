@@ -24,16 +24,14 @@ pipeline {
     stages {
         stage('Checkout Bagisto Code') {
             steps {
-                echo '=== Cloning Bagisto application code ==='
-                dir('bagisto-app') {
-                    git branch: 'main',
-                        credentialsId: 'GITHUB_PAT',
-                        url: 'https://github.com/baotran1103/bagisto.git'
+                script {
+                    // Clone Bagisto application from your repository
+                    dir('bagisto-app') {
+                        git branch: 'main',
+                            credentialsId: 'github-pat',
+                            url: 'https://github.com/baotran1103/bagisto-app.git'
+                    }
                 }
-                sh '''
-                    echo "✓ Bagisto code cloned to: $(pwd)/bagisto-app"
-                    ls -la bagisto-app/
-                '''
             }
         }
         
