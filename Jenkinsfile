@@ -22,6 +22,21 @@ pipeline {
     }
     
     stages {
+        stage('Checkout Bagisto Code') {
+            steps {
+                echo '=== Cloning Bagisto application code ==='
+                dir('bagisto-app') {
+                    git branch: 'main',
+                        credentialsId: 'GITHUB_PAT',
+                        url: 'https://github.com/baotran1103/bagisto.git'
+                }
+                sh '''
+                    echo "✓ Bagisto code cloned to: $(pwd)/bagisto-app"
+                    ls -la bagisto-app/
+                '''
+            }
+        }
+        
         stage('Install System Dependencies') {
             steps {
                 echo '=== Installing Node.js and system tools ==='
@@ -51,122 +66,140 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 echo '=== Setting up application environment ==='
-                sh '''
-                    # Verify we have composer.json
-                    if [ ! -f composer.json ]; then
-                        echo "❌ ERROR: composer.json not found!"
-                        exit 1
-                    fi
-                    
-                    # Create .env if needed
-                    if [ ! -f .env ]; then
-                        if [ -f .env.example ]; then
-                            cp .env.example .env
-                            echo "✓ Created .env from .env.example"
-                        else
-                            echo "APP_ENV=testing" > .env
-                            echo "✓ Created minimal .env"
+                dir('bagisto-app') {
+                    sh '''
+                        # Check if composer.json exists
+                        if [ ! -f composer.json ]; then
+                            echo "❌ ERROR: composer.json not found!"
+                            exit 1
                         fi
-                    fi
-                '''
+                        
+                        # Create .env if needed
+                        if [ ! -f .env ]; then
+                            if [ -f .env.example ]; then
+                                cp .env.example .env
+                                echo "✓ Created .env from .env.example"
+                            else
+                                echo "APP_ENV=testing" > .env
+                                echo "✓ Created minimal .env"
+                            fi
+                        fi
+                    '''
+                }
             }
         }
         
         stage('Install Dependencies') {
             steps {
                 echo '=== Installing Composer dependencies ==='
-                sh '''
-                    composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
+                    '''
+                }
                 
                 echo '=== Installing NPM dependencies ==='
-                sh '''
-                    npm install --quiet
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        npm install --quiet
+                    '''
+                }
             }
         }
         
         stage('Run Tests') {
             steps {
                 echo '=== Running PHPUnit tests ==='
-                sh '''
-                    php artisan test || echo "⚠ Some tests failed but continuing..."
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        php artisan test || echo "⚠ Some tests failed but continuing..."
+                    '''
+                }
             }
         }
         
         stage('Code Quality Analysis') {
             steps {
                 echo '=== Running SonarQube analysis ==='
-                sh '''
-                    # Install docker CLI if needed
-                    which docker || apt-get install -y -qq docker.io
-                    
-                    docker run --rm \
-                        --network bagisto-docker_default \
-                        -v ${WORKSPACE}:/usr/src \
-                        -e SONAR_HOST_URL=${SONAR_HOST} \
-                        -e SONAR_TOKEN=${SONAR_TOKEN} \
-                        sonarsource/sonar-scanner-cli:latest \
-                        -Dsonar.projectKey=bagisto \
-                        -Dsonar.projectName=Bagisto \
-                        -Dsonar.sources=app,packages \
-                        -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        # Install docker CLI if needed
+                        which docker || apt-get install -y -qq docker.io
+                        
+                        docker run --rm \
+                            --network bagisto-docker_default \
+                            -v ${WORKSPACE}/bagisto-app:/usr/src \
+                            -e SONAR_HOST_URL=${SONAR_HOST} \
+                            -e SONAR_TOKEN=${SONAR_TOKEN} \
+                            sonarsource/sonar-scanner-cli:latest \
+                            -Dsonar.projectKey=bagisto \
+                            -Dsonar.projectName=Bagisto \
+                            -Dsonar.sources=app,packages \
+                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**
+                    '''
+                }
             }
         }
         
         stage('Security Scan') {
             steps {
                 echo '=== Running security audits ==='
-                sh '''
-                    echo "📦 Composer security audit:"
-                    composer audit || echo "⚠ PHP vulnerabilities found"
-                    
-                    echo ""
-                    echo "📦 NPM security audit:"
-                    npm audit --audit-level=moderate || echo "⚠ Node vulnerabilities found"
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        echo "📦 Composer security audit:"
+                        composer audit || echo "⚠ PHP vulnerabilities found"
+                        
+                        echo ""
+                        echo "📦 NPM security audit:"
+                        npm audit --audit-level=moderate || echo "⚠ Node vulnerabilities found"
+                    '''
+                }
             }
         }
         
         stage('Build Assets') {
             steps {
                 echo '=== Building frontend assets ==='
-                sh '''
-                    npm run build
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        npm run build
+                    '''
+                }
             }
         }
         
         stage('Optimize Application') {
             steps {
                 echo '=== Optimizing Laravel ==='
-                sh '''
-                    php artisan config:cache
-                    php artisan route:cache
-                    php artisan view:cache
-                    
-                    echo "✓ Laravel optimization completed"
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        php artisan config:cache
+                        php artisan route:cache
+                        php artisan view:cache
+                        
+                        echo "✓ Laravel optimization completed"
+                    '''
+                }
             }
         }
         
         stage('Create Deployment Package') {
             steps {
                 echo '=== Creating deployment artifact ==='
-                sh '''
-                    tar -czf bagisto-build-${BUILD_NUMBER}.tar.gz \
-                        --exclude=node_modules \
-                        --exclude=.git \
-                        --exclude=tests \
-                        --exclude=storage/logs/* \
-                        --exclude=*.tar.gz \
-                        .
-                    
-                    echo "✓ Build artifact: bagisto-build-${BUILD_NUMBER}.tar.gz"
-                    ls -lh bagisto-build-${BUILD_NUMBER}.tar.gz
-                '''
+                dir('bagisto-app') {
+                    sh '''
+                        tar -czf ../bagisto-build-${BUILD_NUMBER}.tar.gz \
+                            --exclude=node_modules \
+                            --exclude=.git \
+                            --exclude=tests \
+                            --exclude=storage/logs/* \
+                            --exclude=*.tar.gz \
+                            .
+                        
+                        echo "✓ Build artifact: bagisto-build-${BUILD_NUMBER}.tar.gz"
+                        ls -lh ../bagisto-build-${BUILD_NUMBER}.tar.gz
+                    '''
+                }
             }
         }
     }
