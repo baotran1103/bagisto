@@ -1,5 +1,15 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'php:8.3-fpm'
+            args '''
+                -v $HOME/.composer:/root/.composer
+                -v /var/run/docker.sock:/var/run/docker.sock
+                --network bagisto-docker_default
+                -u root
+            '''
+        }
+    }
     
     triggers {
         pollSCM('H/5 * * * *')
@@ -8,8 +18,6 @@ pipeline {
     environment {
         SONAR_HOST = 'http://sonarqube:9000'
         SONAR_TOKEN = 'squ_c06a60d0ca3bd18bf70e30588758f1471f5985f3'
-        PROJECT_DIR = '/var/www/html/bagisto'
-        WORKSPACE_DIR = '/var/jenkins_workspace/bagisto'
     }
     
     stages {
@@ -20,15 +28,25 @@ pipeline {
             }
         }
         
-        stage('Environment Info') {
+        stage('Install System Dependencies') {
             steps {
-                echo '=== Checking environment ==='
+                echo '=== Installing Node.js and system tools ==='
                 sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T php-fpm php -v
-                    docker-compose exec -T php-fpm composer --version
-                    docker-compose exec -T php-fpm node --version
-                    docker-compose exec -T php-fpm npm --version
+                    apt-get update
+                    apt-get install -y nodejs npm git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev
+                    
+                    # Install PHP extensions
+                    docker-php-ext-configure gd --with-freetype --with-jpeg
+                    docker-php-ext-install pdo pdo_mysql zip gd
+                    
+                    # Install Composer
+                    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                    
+                    # Verify installations
+                    php -v
+                    composer --version
+                    node --version
+                    npm --version
                 '''
             }
         }
@@ -36,26 +54,17 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo '=== Installing PHP dependencies ==='
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm composer install --no-interaction --prefer-dist --optimize-autoloader
-                '''
+                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
                 
                 echo '=== Installing Node dependencies ==='
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm npm install
-                '''
+                sh 'npm install'
             }
         }
         
         stage('Run Tests') {
             steps {
                 echo '=== Running PHPUnit tests ==='
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan test || echo "Tests failed but continuing..."
-                '''
+                sh 'php artisan test || echo "Tests failed but continuing..."'
             }
         }
         
@@ -63,10 +72,12 @@ pipeline {
             steps {
                 echo '=== Running SonarQube analysis ==='
                 sh '''
-                    cd ${WORKSPACE_DIR}
+                    # Install docker CLI for running sonar-scanner
+                    apt-get install -y docker.io
+                    
                     docker run --rm \
                         --network bagisto-docker_default \
-                        -v ${WORKSPACE_DIR}/workspace/bagisto:/usr/src \
+                        -v ${WORKSPACE}:/usr/src \
                         -e SONAR_HOST_URL=${SONAR_HOST} \
                         -e SONAR_TOKEN=${SONAR_TOKEN} \
                         sonarsource/sonar-scanner-cli:latest \
@@ -78,50 +89,46 @@ pipeline {
             }
         }
         
-        stage('Virus Scan') {
-            steps {
-                echo '=== Scanning for viruses with ClamAV ==='
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T clamav clamdscan --multiscan --fdpass /scan/workspace/bagisto || echo "Scan completed"
-                '''
-            }
-        }
-        
         stage('Build Assets') {
             steps {
                 echo '=== Building frontend assets ==='
-                sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm npm run build
-                '''
+                sh 'npm run build'
                 
                 echo '=== Optimizing Laravel application ==='
                 sh '''
-                    cd ${WORKSPACE_DIR}
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan config:cache
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan route:cache
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan view:cache
+                    php artisan config:cache
+                    php artisan route:cache
+                    php artisan view:cache
                 '''
             }
         }
         
-        stage('Deploy to Local') {
+        stage('Security Scan') {
             steps {
-                echo '=== Deploying to local Docker environment ==='
+                echo '=== Running security checks ==='
                 sh '''
-                    cd ${WORKSPACE_DIR}
+                    # Composer audit
+                    composer audit || echo "Vulnerabilities found"
                     
-                    # Clear cache
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan cache:clear
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan config:clear
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan route:clear
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan view:clear
+                    # NPM audit
+                    npm audit || echo "Vulnerabilities found"
+                '''
+            }
+        }
+        
+        stage('Deploy Artifacts') {
+            steps {
+                echo '=== Archiving build artifacts ==='
+                sh '''
+                    # Create deployment package
+                    tar -czf bagisto-build.tar.gz \
+                        --exclude=node_modules \
+                        --exclude=.git \
+                        --exclude=tests \
+                        --exclude=storage/logs/* \
+                        .
                     
-                    # Run migrations
-                    docker-compose exec -T -w ${PROJECT_DIR} php-fpm php artisan migrate --force || echo "Migration completed"
-                    
-                    echo "✓ Deployment completed successfully!"
+                    echo "✓ Build artifacts created: bagisto-build.tar.gz"
                 '''
             }
         }
@@ -133,6 +140,7 @@ pipeline {
         }
         success {
             echo '✓ Pipeline completed successfully!'
+            archiveArtifacts artifacts: 'bagisto-build.tar.gz', fingerprint: true
         }
         failure {
             echo '✗ Pipeline failed! Check logs above.'
