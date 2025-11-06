@@ -1,5 +1,17 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'php:8.3-fpm'
+            args '''
+                -v composer-cache:/root/.composer
+                -v npm-cache:/root/.npm
+                -v /var/run/docker.sock:/var/run/docker.sock
+                --network bagisto-docker_default
+                -u root
+            '''
+            reuseNode true
+        }
+    }
     
     triggers {
         pollSCM('H/5 * * * *')
@@ -8,8 +20,6 @@ pipeline {
     environment {
         SONAR_HOST = 'http://sonarqube:9000'
         SONAR_TOKEN = 'squ_c06a60d0ca3bd18bf70e30588758f1471f5985f3'
-        COMPOSE_DIR = '/var/jenkins_workspace/bagisto'
-        APP_DIR = '/var/www/html/bagisto'
     }
     
     stages {
@@ -20,18 +30,52 @@ pipeline {
             }
         }
         
-        stage('Sync Code to Container') {
+        stage('Install System Dependencies') {
             steps {
-                echo '=== Syncing code to php-fpm container ==='
+                echo '=== Installing Node.js and system tools ==='
                 sh '''
-                    # Copy code from Jenkins workspace to mounted volume
-                    # The workspace/bagisto folder is already mounted in docker-compose
-                    cd ${COMPOSE_DIR}
+                    apt-get update -qq
+                    apt-get install -y -qq nodejs npm git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev curl
                     
-                    # Verify php-fpm container is running
-                    docker-compose ps php-fpm
+                    # Install PHP extensions
+                    docker-php-ext-configure gd --with-freetype --with-jpeg
+                    docker-php-ext-install pdo pdo_mysql zip gd
                     
-                    echo "✓ Code synced via mounted volume"
+                    # Install Composer
+                    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                    
+                    # Verify installations
+                    echo "✓ PHP: $(php -v | head -n1)"
+                    echo "✓ Composer: $(composer --version)"
+                    echo "✓ Node: $(node --version)"
+                    echo "✓ NPM: $(npm --version)"
+                    echo "✓ Working directory: $(pwd)"
+                    echo "✓ Files in workspace:"
+                    ls -la
+                '''
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                echo '=== Setting up application environment ==='
+                sh '''
+                    # Verify we have composer.json
+                    if [ ! -f composer.json ]; then
+                        echo "❌ ERROR: composer.json not found!"
+                        exit 1
+                    fi
+                    
+                    # Create .env if needed
+                    if [ ! -f .env ]; then
+                        if [ -f .env.example ]; then
+                            cp .env.example .env
+                            echo "✓ Created .env from .env.example"
+                        else
+                            echo "APP_ENV=testing" > .env
+                            echo "✓ Created minimal .env"
+                        fi
+                    fi
                 '''
             }
         }
@@ -40,14 +84,12 @@ pipeline {
             steps {
                 echo '=== Installing Composer dependencies ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm composer install --no-interaction --prefer-dist --optimize-autoloader
+                    composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
                 '''
                 
                 echo '=== Installing NPM dependencies ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm npm install
+                    npm install --quiet
                 '''
             }
         }
@@ -56,8 +98,7 @@ pipeline {
             steps {
                 echo '=== Running PHPUnit tests ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan test || echo "⚠ Tests failed but continuing..."
+                    php artisan test || echo "⚠ Some tests failed but continuing..."
                 '''
             }
         }
@@ -66,10 +107,12 @@ pipeline {
             steps {
                 echo '=== Running SonarQube analysis ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
+                    # Install docker CLI if needed
+                    which docker || apt-get install -y -qq docker.io
+                    
                     docker run --rm \
                         --network bagisto-docker_default \
-                        -v ${COMPOSE_DIR}/workspace/bagisto:/usr/src \
+                        -v ${WORKSPACE}:/usr/src \
                         -e SONAR_HOST_URL=${SONAR_HOST} \
                         -e SONAR_TOKEN=${SONAR_TOKEN} \
                         sonarsource/sonar-scanner-cli:latest \
@@ -83,16 +126,14 @@ pipeline {
         
         stage('Security Scan') {
             steps {
-                echo '=== Running Composer security audit ==='
+                echo '=== Running security audits ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm composer audit || echo "⚠ Vulnerabilities found"
-                '''
-                
-                echo '=== Running NPM security audit ==='
-                sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm npm audit --audit-level=moderate || echo "⚠ Vulnerabilities found"
+                    echo "📦 Composer security audit:"
+                    composer audit || echo "⚠ PHP vulnerabilities found"
+                    
+                    echo ""
+                    echo "📦 NPM security audit:"
+                    npm audit --audit-level=moderate || echo "⚠ Node vulnerabilities found"
                 '''
             }
         }
@@ -101,41 +142,38 @@ pipeline {
             steps {
                 echo '=== Building frontend assets ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm npm run build
+                    npm run build
                 '''
             }
         }
         
         stage('Optimize Application') {
             steps {
-                echo '=== Optimizing Laravel caches ==='
+                echo '=== Optimizing Laravel ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan config:cache
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan route:cache
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan view:cache
+                    php artisan config:cache
+                    php artisan route:cache
+                    php artisan view:cache
+                    
+                    echo "✓ Laravel optimization completed"
                 '''
             }
         }
         
-        stage('Database Migration') {
+        stage('Create Deployment Package') {
             steps {
-                echo '=== Running database migrations ==='
+                echo '=== Creating deployment artifact ==='
                 sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan migrate --force || echo "⚠ Migration completed with warnings"
-                '''
-            }
-        }
-        
-        stage('Clear Caches') {
-            steps {
-                echo '=== Clearing application caches ==='
-                sh '''
-                    cd ${COMPOSE_DIR}
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan cache:clear
-                    docker-compose exec -T -w ${APP_DIR} php-fpm php artisan config:clear
+                    tar -czf bagisto-build-${BUILD_NUMBER}.tar.gz \
+                        --exclude=node_modules \
+                        --exclude=.git \
+                        --exclude=tests \
+                        --exclude=storage/logs/* \
+                        --exclude=*.tar.gz \
+                        .
+                    
+                    echo "✓ Build artifact: bagisto-build-${BUILD_NUMBER}.tar.gz"
+                    ls -lh bagisto-build-${BUILD_NUMBER}.tar.gz
                 '''
             }
         }
@@ -147,10 +185,14 @@ pipeline {
         }
         success {
             echo '✅ Pipeline completed successfully!'
-            echo '🚀 Application deployed and ready at http://localhost'
+            archiveArtifacts artifacts: 'bagisto-build-*.tar.gz', fingerprint: true, allowEmptyArchive: true
         }
         failure {
             echo '❌ Pipeline failed! Check logs above.'
+        }
+        cleanup {
+            echo '=== Cleaning up workspace ==='
+            cleanWs(deleteDirs: true, disableDeferredWipeout: true, notFailBuild: true)
         }
     }
 }
