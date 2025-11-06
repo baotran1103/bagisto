@@ -28,7 +28,7 @@ pipeline {
                     // Clone Bagisto application from your repository
                     dir('bagisto-app') {
                         git branch: 'main',
-                            credentialsId: 'github-pat',
+                            credentialsId: 'GITHUB_PAT',
                             url: 'https://github.com/baotran1103/bagisto-app.git'
                     }
                 }
