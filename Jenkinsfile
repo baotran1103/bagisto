@@ -44,15 +44,16 @@ pipeline {
                         
                         cat >> .env << EOF
 # CI/CD Database Configuration (Injected from Jenkins)
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_DATABASE=${DB_DATABASE}
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=bagisto_testing
 DB_USERNAME=${DB_USERNAME}
 DB_PASSWORD=${DB_PASSWORD}
 
 # Testing Environment
 APP_ENV=testing
 APP_DEBUG=false
+APP_KEY=base64:$(openssl rand -base64 32)
 EOF
                         
                         echo "✓ Environment configured with secure credentials"
@@ -126,10 +127,22 @@ EOF
                             sh '''
                                 php artisan key:generate --force
                                 
+                                # Wait for database to be ready
+                                echo "Waiting for database connection..."
+                                for i in {1..30}; do
+                                    if php artisan migrate:status --env=testing >/dev/null 2>&1; then
+                                        echo "Database is ready!"
+                                        break
+                                    fi
+                                    echo "Waiting for database... ($i/30)"
+                                    sleep 2
+                                done
+                                
                                 php artisan migrate --force --env=testing
                                 
+                                # Run only ExampleTest.php
                                 echo "🧪 Running ExampleTest only..."
-                                php artisan test tests/ExampleTest.php
+                                php artisan test tests/ExampleTest.php --verbose
                                 
                                 echo "✅ ExampleTest passed!"
                             '''
