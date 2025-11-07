@@ -62,7 +62,9 @@ pipeline {
                 }
                 stash name: 'configured-source', includes: 'bagisto-app/**'
             }
-        }        stage('Parallel Build') {
+        }
+        
+        stage('Parallel Build') {
             parallel {
                 stage('Backend Dependencies') {
                     agent {
