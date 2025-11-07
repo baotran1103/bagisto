@@ -2,8 +2,8 @@ pipeline {
     agent none
 
     triggers {
-        // ✅ IMPROVED: GitHub webhook trigger (more efficient than polling)
-        githubPush()
+        // ✅ FOR LOCAL DEVELOPMENT: Use polling since webhook from GitHub cloud can't reach local Jenkins
+        pollSCM('H/2 * * * *')  // Check every 2 minutes (reasonable for local dev)
     }
 
     environment {
