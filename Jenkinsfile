@@ -2,8 +2,8 @@ pipeline {
     agent none
 
     triggers {
-        // TODO: Replace with GitHub webhook for better efficiency
-        pollSCM('H/5 * * * *')
+        // ✅ IMPROVED: GitHub webhook trigger (more efficient than polling)
+        githubPush()
     }
 
     environment {
