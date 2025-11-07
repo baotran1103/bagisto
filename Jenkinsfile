@@ -88,6 +88,9 @@ pipeline {
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
+                                # Create minimal .env for artisan commands
+                                cp .env.example .env 2>/dev/null || echo "APP_KEY=" > .env
+                                
                                 php artisan key:generate --force
                                 
                                 php artisan test tests/ExampleTest.php --stop-on-failure
