@@ -268,7 +268,6 @@ EOF
                     '''
                 }
                 
-                // ✅ IMPROVED: Archive with better naming
                 archiveArtifacts artifacts: 'bagisto-*.tar.gz', fingerprint: true, allowEmptyArchive: false
             }
         }
@@ -295,10 +294,24 @@ EOF
                 echo '🚀 Artifact ready for deployment'
                 echo "📦 Download: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
                 
-                // TODO: Add email/Slack notification here
-                // emailext subject: "✅ Build Success: Bagisto ${BUILD_NUMBER}",
-                //         body: "Build successful. Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz",
-                //         to: 'dev-team@company.com'
+                // ✅ ENABLED: Email notification for successful builds
+                emailext subject: "✅ Build Success: Bagisto ${BUILD_NUMBER}",
+                        body: """
+                        🎉 Build completed successfully!
+                        
+                        Build Details:
+                        - Build Number: ${BUILD_NUMBER}
+                        - Git Commit: ${GIT_COMMIT}
+                        - Git Branch: ${GIT_BRANCH}
+                        - Duration: ${currentBuild.durationString}
+                        
+                        📦 Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz
+                        
+                        🔗 Jenkins Build: ${BUILD_URL}
+                        
+                        Ready for deployment!
+                        """,
+                        to: 'your-email@example.com'  // ⚠️ CHANGE THIS TO YOUR EMAIL
             }
         }
         failure {
@@ -306,10 +319,22 @@ EOF
                 echo '❌ Pipeline failed! Check logs above for details.'
                 echo '🔄 Rollback: Use previous successful build artifact'
                 
-                // TODO: Add failure notification
-                // emailext subject: "❌ Build Failed: Bagisto ${BUILD_NUMBER}",
-                //         body: "Build failed. Check Jenkins logs for details.",
-                //         to: 'dev-team@company.com'
+                // ✅ ENABLED: Email notification for failed builds
+                emailext subject: "❌ Build Failed: Bagisto ${BUILD_NUMBER}",
+                        body: """
+                        🚨 Build failed!
+                        
+                        Build Details:
+                        - Build Number: ${BUILD_NUMBER}
+                        - Git Commit: ${GIT_COMMIT}
+                        - Git Branch: ${GIT_BRANCH}
+                        - Duration: ${currentBuild.durationString}
+                        
+                        🔗 Jenkins Build: ${BUILD_URL}
+                        
+                        Please check the build logs for details and fix the issues.
+                        """,
+                        to: 'your-email@example.com'  // ⚠️ CHANGE THIS TO YOUR EMAIL
             }
         }
         cleanup {
