@@ -2,18 +2,13 @@ pipeline {
     agent none
 
     triggers {
-        pollSCM('H/2 * * * *')
+        pollSCM('H/5 * * * *')
     }
 
     environment {
         SONAR_HOST = 'http://sonarqube:9000'
         SONAR_TOKEN = credentials('sonarqube-token')
         DOCKER_NETWORK = 'bagisto-docker_default'
-        DB_HOST = 'mysql'
-        DB_PORT = '3306'
-        DB_DATABASE = 'bagisto_testing'
-        DB_USERNAME = credentials('db-username')
-        DB_PASSWORD = credentials('db-password')
     }
 
     stages {
@@ -34,44 +29,6 @@ pipeline {
             }
         }
         
-        stage('Setup Environment') {
-            agent any
-            steps {
-                unstash 'source-code'
-                dir('bagisto-app') {
-                    sh """
-                        cp .env.example .env
-                        
-                        cat >> .env << EOF
-# CI/CD Database Configuration (Injected from Jenkins)
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=bagisto_testing
-DB_USERNAME=\${DB_USERNAME}
-DB_PASSWORD=\${DB_PASSWORD}
-
-# Testing Environment
-APP_ENV=testing
-APP_DEBUG=false
-APP_KEY=base64:\$(openssl rand -base64 32)
-
-# Disable Redis for CI/CD (use array driver instead)
-CACHE_DRIVER=array
-SESSION_DRIVER=array
-QUEUE_CONNECTION=sync
-REDIS_CLIENT=phpredis
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
-REDIS_PORT=6379
-EOF
-                        
-                        echo "✓ Environment configured with secure credentials"
-                    """
-                }
-                stash name: 'configured-source', includes: 'bagisto-app/**'
-            }
-        }
-        
         stage('Parallel Build') {
             parallel {
                 stage('Backend Dependencies') {
@@ -82,7 +39,7 @@ EOF
                         }
                     }
                     steps {
-                        unstash 'configured-source'
+                        unstash 'source-code'
                         dir('bagisto-app') {
                             sh '''
                                 composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress || echo "⚠️ Composer install completed with warnings"
@@ -101,7 +58,7 @@ EOF
                         }
                     }
                     steps {
-                        unstash 'configured-source'
+                        unstash 'source-code'
                         dir('bagisto-app') {
                             sh '''
                                 npm install --quiet
@@ -120,55 +77,21 @@ EOF
         stage('Tests & Quality') {
             parallel {
                 stage('PHPUnit Tests') {
-                    agent any
+                    agent {
+                        docker {
+                            image 'php-fpm:latest'
+                            args '-u root'
+                        }
+                    }
                     steps {
-                        script {
-                            // Start only MySQL service (Redis not needed for tests)
+                        unstash 'source-code'
+                        unstash 'backend-deps'
+                        dir('bagisto-app') {
                             sh '''
-                                cd ${WORKSPACE}
-                                docker compose up -d mysql
+                                php artisan key:generate --force
                                 
-                                # Wait for MySQL to be ready
-                                echo "Waiting for MySQL..."
-                                for i in {1..30}; do
-                                    if docker compose exec -T mysql mysqladmin ping -h localhost --silent; then
-                                        echo "✅ MySQL is ready!"
-                                        break
-                                    fi
-                                    echo "Waiting for MySQL... ($i/30)"
-                                    sleep 2
-                                done
+                                php artisan test tests/ExampleTest.php --stop-on-failure
                             '''
-                            
-                            // Run tests in PHP container with network access to services
-                            docker.image('php-fpm:latest').inside("--network ${DOCKER_NETWORK} -u root") {
-                                unstash 'configured-source'
-                                unstash 'backend-deps'
-                                dir('bagisto-app') {
-                                    sh '''
-                                        php artisan key:generate --force
-                                        
-                                        # Wait for database connection
-                                        echo "Waiting for database connection..."
-                                        for i in {1..30}; do
-                                            if php artisan migrate:status --env=testing >/dev/null 2>&1; then
-                                                echo "Database is ready!"
-                                                break
-                                            fi
-                                            echo "Waiting for database... ($i/30)"
-                                            sleep 2
-                                        done
-                                        
-                                        php artisan migrate --force --env=testing
-                                        
-                                        # Run only ExampleTest.php
-                                        echo "🧪 Running ExampleTest only..."
-                                        php artisan test tests/ExampleTest.php
-                                        
-                                        echo "✅ ExampleTest passed!"
-                                    '''
-                                }
-                            }
                         }
                     }
                 }
@@ -181,7 +104,7 @@ EOF
                         }
                     }
                     steps {
-                        unstash 'configured-source'
+                        unstash 'source-code'
                         dir('bagisto-app') {
                             sh """
                                 sonar-scanner \\
@@ -207,7 +130,7 @@ EOF
                                 }
                             }
                             steps {
-                                unstash 'configured-source'
+                                unstash 'source-code'
                                 unstash 'backend-deps'
                                 dir('bagisto-app') {
                                     sh '''
@@ -225,7 +148,7 @@ EOF
                                 }
                             }
                             steps {
-                                unstash 'configured-source'
+                                unstash 'source-code'
                                 unstash 'frontend-build'
                                 dir('bagisto-app') {
                                     sh '''
@@ -239,36 +162,11 @@ EOF
             }
         }
         
-        stage('Optimize Application') {
-            agent {
-                docker {
-                    image 'php-fpm:latest'
-                    args '-u root'
-                }
-            }
-            steps {
-                unstash 'configured-source'
-                unstash 'backend-deps'
-                dir('bagisto-app') {
-                    sh '''
-                        php artisan config:cache
-                        php artisan route:cache
-                        php artisan view:cache
-                        
-                        php artisan --version
-                        php artisan config:list --env=testing | head -5
-                        
-                        echo "✓ Laravel optimization completed"
-                    '''
-                }
-                stash name: 'optimized-app', includes: 'bagisto-app/**', excludes: 'bagisto-app/node_modules/**'
-            }
-        }
-        
         stage('Create Deployment Package') {
             agent any
             steps {
-                unstash 'optimized-app'
+                unstash 'source-code'
+                unstash 'backend-deps'
                 unstash 'frontend-build'
                 
                 dir('bagisto-app') {
