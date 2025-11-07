@@ -9,7 +9,6 @@ pipeline {
         SONAR_HOST = 'http://sonarqube:9000'
         SONAR_TOKEN = credentials('sonarqube-token')
         DOCKER_NETWORK = 'bagisto-docker_default'
-        // Database credentials from Jenkins
         DB_HOST = 'mysql'
         DB_PORT = '3306'
         DB_DATABASE = 'bagisto_testing'
@@ -22,7 +21,6 @@ pipeline {
             agent any
             steps {
                 script {
-                    echo '=== Cloning Bagisto Application ==='
                     dir('bagisto-app') {
                         git branch: 'main',
                             credentialsId: 'GITHUB_PAT',
@@ -77,7 +75,6 @@ pipeline {
                         unstash 'configured-source'
                         dir('bagisto-app') {
                             sh '''
-                                echo "=== Installing Composer Dependencies ==="
                                 composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
                                 echo "✓ Composer packages installed"
                             '''
@@ -97,10 +94,8 @@ pipeline {
                         unstash 'configured-source'
                         dir('bagisto-app') {
                             sh '''
-                                echo "=== Installing NPM Dependencies ==="
                                 npm install --quiet
                                 
-                                echo "=== Building Frontend Assets ==="
                                 npm run build
                                 
                                 echo "✓ Frontend built successfully"
@@ -129,13 +124,10 @@ pipeline {
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
-                                echo "=== Generating Application Key ==="
                                 php artisan key:generate --force
                                 
-                                echo "=== Running Database Migrations ==="
                                 php artisan migrate --force --env=testing
                                 
-                                echo "=== Running PHPUnit Tests ==="
                                 php artisan test
                                 
                                 echo "✅ All tests passed!"
@@ -155,7 +147,6 @@ pipeline {
                         unstash 'configured-source'
                         dir('bagisto-app') {
                             sh """
-                                echo "=== Running SonarQube Analysis ==="
                                 sonar-scanner \\
                                     -Dsonar.projectKey=bagisto \\
                                     -Dsonar.projectName=Bagisto \\
@@ -183,7 +174,6 @@ pipeline {
                                 unstash 'backend-deps'
                                 dir('bagisto-app') {
                                     sh '''
-                                        echo "📦 Composer Security Audit:"
                                         composer audit || echo "⚠️ PHP vulnerabilities found"
                                     '''
                                 }
@@ -202,7 +192,6 @@ pipeline {
                                 unstash 'frontend-build'
                                 dir('bagisto-app') {
                                     sh '''
-                                        echo "📦 NPM Security Audit:"
                                         npm audit --audit-level=moderate || echo "⚠️ Node vulnerabilities found"
                                     '''
                                 }
@@ -225,12 +214,10 @@ pipeline {
                 unstash 'backend-deps'
                 dir('bagisto-app') {
                     sh '''
-                        echo "=== Optimizing Laravel ==="
                         php artisan config:cache
                         php artisan route:cache
                         php artisan view:cache
                         
-                        echo "=== Health Check ==="
                         php artisan --version
                         php artisan config:list --env=testing | head -5
                         
@@ -249,7 +236,6 @@ pipeline {
                 
                 dir('bagisto-app') {
                     sh '''
-                        echo "=== Creating Deployment Artifact ==="
                         ARTIFACT_NAME="bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
                         tar -czf "../${ARTIFACT_NAME}" \\
                             --exclude=node_modules \\
@@ -261,7 +247,6 @@ pipeline {
                         
                         echo "✓ Build artifact: ${ARTIFACT_NAME}"
                         ls -lh "../${ARTIFACT_NAME}"
-                        echo "📋 Artifact contains:"
                         tar -tzf "../${ARTIFACT_NAME}" | head -10
                     '''
                 }
