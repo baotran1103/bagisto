@@ -84,7 +84,8 @@ pipeline {
                             sh '''
                                 # Create required Laravel directories
                                 mkdir -p bootstrap/cache
-                                chmod -R 775 bootstrap/cache
+                                mkdir -p storage/framework/{sessions,views,cache}
+                                chmod -R 775 bootstrap/cache storage
                                 
                                 # Run pure unit tests - no Laravel boot required
                                 php artisan test tests/Unit/CoreHelpersTest.php --stop-on-failure
