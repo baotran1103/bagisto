@@ -2,13 +2,12 @@ pipeline {
     agent none
 
     triggers {
-        // ✅ FOR LOCAL DEVELOPMENT: Use polling since webhook from GitHub cloud can't reach local Jenkins
-        pollSCM('H/2 * * * *')  // Check every 2 minutes (reasonable for local dev)
+        pollSCM('H/2 * * * *')
     }
 
     environment {
         SONAR_HOST = 'http://sonarqube:9000'
-        SONAR_TOKEN = credentials('sonarqube-token')  // ✅ Fixed: Use Jenkins credentials
+        SONAR_TOKEN = credentials('sonarqube-token')
         DOCKER_NETWORK = 'bagisto-docker_default'
         // Database credentials from Jenkins
         DB_HOST = 'mysql'
@@ -29,7 +28,6 @@ pipeline {
                             credentialsId: 'GITHUB_PAT',
                             url: 'https://github.com/baotran1103/bagisto-app.git'
                         
-                        // Get git commit hash for versioning
                         env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         env.GIT_BRANCH = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
                     }
@@ -47,17 +45,17 @@ pipeline {
                         cp .env.example .env
                         
                         cat >> .env << EOF
-# CI/CD Database Configuration (Injected from Jenkins)
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_DATABASE=${DB_DATABASE}
-DB_USERNAME=${DB_USERNAME}
-DB_PASSWORD=${DB_PASSWORD}
+                        # CI/CD Database Configuration (Injected from Jenkins)
+                        DB_HOST=${DB_HOST}
+                        DB_PORT=${DB_PORT}
+                        DB_DATABASE=${DB_DATABASE}
+                        DB_USERNAME=${DB_USERNAME}
+                        DB_PASSWORD=${DB_PASSWORD}
 
-# Testing Environment
-APP_ENV=testing
-APP_DEBUG=false
-EOF
+                        # Testing Environment
+                        APP_ENV=testing
+                        APP_DEBUG=false
+                        EOF
                         
                         echo "✓ Environment configured with secure credentials"
                     '''
@@ -136,7 +134,6 @@ EOF
                                 php artisan migrate --force --env=testing
                                 
                                 echo "=== Running PHPUnit Tests ==="
-                                # ❌ REMOVED: No longer continue on test failure
                                 php artisan test
                                 
                                 echo "✅ All tests passed!"
@@ -251,7 +248,6 @@ EOF
                 dir('bagisto-app') {
                     sh '''
                         echo "=== Creating Deployment Artifact ==="
-                        # ✅ IMPROVED: Include git commit hash for versioning
                         ARTIFACT_NAME="bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
                         tar -czf "../${ARTIFACT_NAME}" \\
                             --exclude=node_modules \\
@@ -294,7 +290,6 @@ EOF
                 echo '🚀 Artifact ready for deployment'
                 echo "📦 Download: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
                 
-                // ✅ ENABLED: Email notification for successful builds
                 emailext subject: "✅ Build Success: Bagisto ${BUILD_NUMBER}",
                         body: """
                         🎉 Build completed successfully!
@@ -311,7 +306,7 @@ EOF
                         
                         Ready for deployment!
                         """,
-                        to: 'your-email@example.com'  // ⚠️ CHANGE THIS TO YOUR EMAIL
+                        to: 'tnqbao11@gmail.com'
             }
         }
         failure {
@@ -319,7 +314,6 @@ EOF
                 echo '❌ Pipeline failed! Check logs above for details.'
                 echo '🔄 Rollback: Use previous successful build artifact'
                 
-                // ✅ ENABLED: Email notification for failed builds
                 emailext subject: "❌ Build Failed: Bagisto ${BUILD_NUMBER}",
                         body: """
                         🚨 Build failed!
@@ -334,7 +328,7 @@ EOF
                         
                         Please check the build logs for details and fix the issues.
                         """,
-                        to: 'your-email@example.com'  // ⚠️ CHANGE THIS TO YOUR EMAIL
+                        to: 'tnqbao11@gmail.com'
             }
         }
         cleanup {
