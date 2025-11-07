@@ -114,10 +114,7 @@ EOF
                     agent {
                         docker {
                             image 'php-fpm:latest'
-                            args """
-                                --network ${DOCKER_NETWORK}
-                                -u root
-                            """
+                            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
                         }
                     }
                     steps {
@@ -125,6 +122,30 @@ EOF
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
+                                # Start MySQL and Redis services for testing
+                                docker-compose up -d mysql redis
+                                
+                                # Wait for services to be ready
+                                echo "Waiting for MySQL..."
+                                for i in {1..30}; do
+                                    if docker-compose exec -T mysql mysqladmin ping -h localhost --silent; then
+                                        echo "MySQL is ready!"
+                                        break
+                                    fi
+                                    echo "Waiting for MySQL... ($i/30)"
+                                    sleep 2
+                                done
+                                
+                                echo "Waiting for Redis..."
+                                for i in {1..10}; do
+                                    if docker-compose exec -T redis redis-cli ping >/dev/null 2>&1; then
+                                        echo "Redis is ready!"
+                                        break
+                                    fi
+                                    echo "Waiting for Redis... ($i/10)"
+                                    sleep 1
+                                done
+                                
                                 php artisan key:generate --force
                                 
                                 # Wait for database to be ready
@@ -142,7 +163,7 @@ EOF
                                 
                                 # Run only ExampleTest.php
                                 echo "🧪 Running ExampleTest only..."
-                                php artisan test tests/ExampleTest.php --verbose
+                                php artisan test tests/ExampleTest.php
                                 
                                 echo "✅ ExampleTest passed!"
                             '''
