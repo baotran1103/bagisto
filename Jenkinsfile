@@ -5,12 +5,6 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
-    environment {
-        SONAR_HOST = 'http://sonarqube:9000'
-        SONAR_TOKEN = credentials('sonarqube-token')
-        DOCKER_NETWORK = 'bagisto-docker_default'
-    }
-
     stages {
         stage('Checkout') {
             agent any
@@ -96,31 +90,53 @@ pipeline {
                 }
                 
                 stage('Code Quality Analysis') {
-                    agent {
-                        docker {
-                            image 'sonarsource/sonar-scanner-cli:latest'
-                            args "--network ${DOCKER_NETWORK}"
-                        }
-                    }
+                    agent any
                     steps {
                         unstash 'source-code'
                         dir('bagisto-app') {
-                            sh """
-                                sonar-scanner \\
-                                    -Dsonar.projectKey=bagisto \\
-                                    -Dsonar.projectName=Bagisto \\
-                                    -Dsonar.sources=app,packages/Webkul \\
-                                    -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
-                                    -Dsonar.host.url=${SONAR_HOST} \\
-                                    -Dsonar.token=${SONAR_TOKEN} \\
-                                    -Dsonar.sourceEncoding=UTF-8 || echo "⚠️ SonarQube analysis failed"
-                            """
+                            script {
+                                // Use SonarQube Plugin instead of Docker container
+                                def scannerHome = tool 'SonarScanner'
+                                withSonarQubeEnv('SonarQube') {
+                                    sh """
+                                        ${scannerHome}/bin/sonar-scanner \\
+                                            -Dsonar.projectKey=bagisto \\
+                                            -Dsonar.projectName=Bagisto \\
+                                            -Dsonar.sources=app,packages/Webkul \\
+                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
+                                            -Dsonar.sourceEncoding=UTF-8
+                                    """
+                                }
+                                
+                                // Wait for Quality Gate
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    def qg = waitForQualityGate()
+                                    if (qg.status != 'OK') {
+                                        echo "⚠️ Quality Gate failed: ${qg.status}"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 
                 stage('Security Audits') {
                     stages {
+                        stage('ClamAV Virus Scan') {
+                            agent any
+                            steps {
+                                unstash 'source-code'
+                                dir('bagisto-app') {
+                                    // ClamAV Plugin scan
+                                    clamav(
+                                        includes: '**/*',
+                                        excludes: '.git/**,vendor/**,node_modules/**,storage/**,public/build/**,bootstrap/cache/**'
+                                    )
+                                    echo "✓ ClamAV scan completed"
+                                }
+                            }
+                        }
+                        
                         stage('Composer Audit') {
                             agent {
                                 docker { 
