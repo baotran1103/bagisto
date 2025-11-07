@@ -111,18 +111,12 @@ EOF
         stage('Tests & Quality') {
             parallel {
                 stage('PHPUnit Tests') {
-                    agent {
-                        docker {
-                            image 'php-fpm:latest'
-                            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
-                        }
-                    }
+                    agent any
                     steps {
-                        unstash 'configured-source'
-                        unstash 'backend-deps'
-                        dir('bagisto-app') {
+                        script {
+                            // Start MySQL and Redis services on host
                             sh '''
-                                # Start MySQL and Redis services for testing
+                                cd ${WORKSPACE}
                                 docker-compose up -d mysql redis
                                 
                                 # Wait for services to be ready
@@ -145,28 +139,37 @@ EOF
                                     echo "Waiting for Redis... ($i/10)"
                                     sleep 1
                                 done
-                                
-                                php artisan key:generate --force
-                                
-                                # Wait for database to be ready
-                                echo "Waiting for database connection..."
-                                for i in {1..30}; do
-                                    if php artisan migrate:status --env=testing >/dev/null 2>&1; then
-                                        echo "Database is ready!"
-                                        break
-                                    fi
-                                    echo "Waiting for database... ($i/30)"
-                                    sleep 2
-                                done
-                                
-                                php artisan migrate --force --env=testing
-                                
-                                # Run only ExampleTest.php
-                                echo "🧪 Running ExampleTest only..."
-                                php artisan test tests/ExampleTest.php
-                                
-                                echo "✅ ExampleTest passed!"
                             '''
+                            
+                            // Run tests in PHP container with network access to services
+                            docker.image('php-fpm:latest').inside("--network ${DOCKER_NETWORK} -u root") {
+                                unstash 'configured-source'
+                                unstash 'backend-deps'
+                                dir('bagisto-app') {
+                                    sh '''
+                                        php artisan key:generate --force
+                                        
+                                        # Wait for database connection
+                                        echo "Waiting for database connection..."
+                                        for i in {1..30}; do
+                                            if php artisan migrate:status --env=testing >/dev/null 2>&1; then
+                                                echo "Database is ready!"
+                                                break
+                                            fi
+                                            echo "Waiting for database... ($i/30)"
+                                            sleep 2
+                                        done
+                                        
+                                        php artisan migrate --force --env=testing
+                                        
+                                        # Run only ExampleTest.php
+                                        echo "🧪 Running ExampleTest only..."
+                                        php artisan test tests/ExampleTest.php
+                                        
+                                        echo "✅ ExampleTest passed!"
+                                    '''
+                                }
+                            }
                         }
                     }
                 }
