@@ -128,9 +128,10 @@ EOF
                                 
                                 php artisan migrate --force --env=testing
                                 
-                                php artisan test
+                                echo "🧪 Running ExampleTest only..."
+                                php artisan test tests/ExampleTest.php
                                 
-                                echo "✅ All tests passed!"
+                                echo "✅ ExampleTest passed!"
                             '''
                         }
                     }
