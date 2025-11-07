@@ -82,13 +82,8 @@ pipeline {
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
-                                # Create required Laravel directories
-                                mkdir -p bootstrap/cache
-                                mkdir -p storage/framework/{sessions,views,cache}
-                                chmod -R 775 bootstrap/cache storage
-                                
-                                # Run pure unit tests - no Laravel boot required
-                                php artisan test tests/Unit/CoreHelpersTest.php --stop-on-failure
+                                # Run pure unit tests directly with Pest - no Laravel boot needed
+                                ./vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure
                             '''
                         }
                     }
