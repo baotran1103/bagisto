@@ -54,6 +54,15 @@ DB_PASSWORD=\${DB_PASSWORD}
 APP_ENV=testing
 APP_DEBUG=false
 APP_KEY=base64:\$(openssl rand -base64 32)
+
+# Disable Redis for CI/CD (use array driver instead)
+CACHE_DRIVER=array
+SESSION_DRIVER=array
+QUEUE_CONNECTION=sync
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
 EOF
                         
                         echo "✓ Environment configured with secure credentials"
@@ -114,30 +123,20 @@ EOF
                     agent any
                     steps {
                         script {
-                            // Start MySQL and Redis services on host
+                            // Start only MySQL service (Redis not needed for tests)
                             sh '''
                                 cd ${WORKSPACE}
-                                docker-compose up -d mysql redis
+                                docker compose up -d mysql
                                 
-                                # Wait for services to be ready
+                                # Wait for MySQL to be ready
                                 echo "Waiting for MySQL..."
                                 for i in {1..30}; do
-                                    if docker-compose exec -T mysql mysqladmin ping -h localhost --silent; then
-                                        echo "MySQL is ready!"
+                                    if docker compose exec -T mysql mysqladmin ping -h localhost --silent; then
+                                        echo "✅ MySQL is ready!"
                                         break
                                     fi
                                     echo "Waiting for MySQL... ($i/30)"
                                     sleep 2
-                                done
-                                
-                                echo "Waiting for Redis..."
-                                for i in {1..10}; do
-                                    if docker-compose exec -T redis redis-cli ping >/dev/null 2>&1; then
-                                        echo "Redis is ready!"
-                                        break
-                                    fi
-                                    echo "Waiting for Redis... ($i/10)"
-                                    sleep 1
                                 done
                             '''
                             
