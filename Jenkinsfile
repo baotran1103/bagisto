@@ -2,13 +2,20 @@ pipeline {
     agent none
 
     triggers {
+        // TODO: Replace with GitHub webhook for better efficiency
         pollSCM('H/5 * * * *')
     }
 
     environment {
         SONAR_HOST = 'http://sonarqube:9000'
-        SONAR_TOKEN = 'squ_c06a60d0ca3bd18bf70e30588758f1471f5985f3'
+        SONAR_TOKEN = credentials('sonarqube-token')  // ✅ Fixed: Use Jenkins credentials
         DOCKER_NETWORK = 'bagisto-docker_default'
+        // Database credentials from Jenkins
+        DB_HOST = 'mysql'
+        DB_PORT = '3306'
+        DB_DATABASE = 'bagisto_testing'
+        DB_USERNAME = credentials('db-username')
+        DB_PASSWORD = credentials('db-password')
     }
 
     stages {
@@ -21,6 +28,10 @@ pipeline {
                         git branch: 'main',
                             credentialsId: 'GITHUB_PAT',
                             url: 'https://github.com/baotran1103/bagisto-app.git'
+                        
+                        // Get git commit hash for versioning
+                        env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        env.GIT_BRANCH = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
                     }
                     stash name: 'source-code', includes: 'bagisto-app/**'
                 }
@@ -35,32 +46,31 @@ pipeline {
                     sh '''
                         cp .env.example .env
                         
-                        cat >> .env << 'EOF'
+                        cat >> .env << EOF
+# CI/CD Database Configuration (Injected from Jenkins)
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_DATABASE=${DB_DATABASE}
+DB_USERNAME=${DB_USERNAME}
+DB_PASSWORD=${DB_PASSWORD}
 
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=bagisto_testing
-DB_USERNAME=root
-DB_PASSWORD=root
-
+# Testing Environment
 APP_ENV=testing
 APP_DEBUG=false
 EOF
                         
-                        echo "✓ Environment configured"
+                        echo "✓ Environment configured with secure credentials"
                     '''
                 }
                 stash name: 'configured-source', includes: 'bagisto-app/**'
             }
-        }
-        
-        stage('Parallel Build') {
+        }        stage('Parallel Build') {
             parallel {
                 stage('Backend Dependencies') {
                     agent {
                         docker {
                             image 'php-fpm:latest'
-                            args '-v composer-cache:/tmp/composer-cache -e COMPOSER_CACHE_DIR=/tmp/composer-cache -u root'
+                            args '-u root'
                         }
                     }
                     steps {
@@ -80,7 +90,7 @@ EOF
                     agent {
                         docker {
                             image 'php-fpm:latest'
-                            args '-v npm-cache:/root/.npm -u root'
+                            args '-u root'
                         }
                     }
                     steps {
@@ -123,10 +133,13 @@ EOF
                                 php artisan key:generate --force
                                 
                                 echo "=== Running Database Migrations ==="
-                                php artisan migrate --force --env=testing || echo "⚠️ Migration failed"
+                                php artisan migrate --force --env=testing
                                 
                                 echo "=== Running PHPUnit Tests ==="
-                                php artisan test || echo "⚠️ Some tests failed but continuing..."
+                                # ❌ REMOVED: No longer continue on test failure
+                                php artisan test
+                                
+                                echo "✅ All tests passed!"
                             '''
                         }
                     }
@@ -218,6 +231,10 @@ EOF
                         php artisan route:cache
                         php artisan view:cache
                         
+                        echo "=== Health Check ==="
+                        php artisan --version
+                        php artisan config:list --env=testing | head -5
+                        
                         echo "✓ Laravel optimization completed"
                     '''
                 }
@@ -234,20 +251,25 @@ EOF
                 dir('bagisto-app') {
                     sh '''
                         echo "=== Creating Deployment Artifact ==="
-                        tar -czf ../bagisto-build-${BUILD_NUMBER}.tar.gz \
-                            --exclude=node_modules \
-                            --exclude=.git \
-                            --exclude=tests \
-                            --exclude=storage/logs/* \
-                            --exclude=*.tar.gz \
+                        # ✅ IMPROVED: Include git commit hash for versioning
+                        ARTIFACT_NAME="bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
+                        tar -czf "../${ARTIFACT_NAME}" \\
+                            --exclude=node_modules \\
+                            --exclude=.git \\
+                            --exclude=tests \\
+                            --exclude=storage/logs/* \\
+                            --exclude=*.tar.gz \\
                             .
                         
-                        echo "✓ Build artifact: bagisto-build-${BUILD_NUMBER}.tar.gz"
-                        ls -lh ../bagisto-build-${BUILD_NUMBER}.tar.gz
+                        echo "✓ Build artifact: ${ARTIFACT_NAME}"
+                        ls -lh "../${ARTIFACT_NAME}"
+                        echo "📋 Artifact contains:"
+                        tar -tzf "../${ARTIFACT_NAME}" | head -10
                     '''
                 }
                 
-                archiveArtifacts artifacts: 'bagisto-build-*.tar.gz', fingerprint: true, allowEmptyArchive: true
+                // ✅ IMPROVED: Archive with better naming
+                archiveArtifacts artifacts: 'bagisto-*.tar.gz', fingerprint: true, allowEmptyArchive: false
             }
         }
     }
@@ -259,20 +281,35 @@ EOF
                 echo """
                 Build Summary:
                 - Build Number: ${BUILD_NUMBER}
+                - Git Commit: ${GIT_COMMIT}
+                - Git Branch: ${GIT_BRANCH}
                 - Status: ${currentBuild.result ?: 'SUCCESS'}
                 - Duration: ${currentBuild.durationString}
+                - Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz
                 """
             }
         }
         success {
             node('') {
                 echo '✅ Pipeline completed successfully!'
-                echo 'Artifact ready for deployment'
+                echo '🚀 Artifact ready for deployment'
+                echo "📦 Download: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
+                
+                // TODO: Add email/Slack notification here
+                // emailext subject: "✅ Build Success: Bagisto ${BUILD_NUMBER}",
+                //         body: "Build successful. Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz",
+                //         to: 'dev-team@company.com'
             }
         }
         failure {
             node('') {
                 echo '❌ Pipeline failed! Check logs above for details.'
+                echo '🔄 Rollback: Use previous successful build artifact'
+                
+                // TODO: Add failure notification
+                // emailext subject: "❌ Build Failed: Bagisto ${BUILD_NUMBER}",
+                //         body: "Build failed. Check Jenkins logs for details.",
+                //         to: 'dev-team@company.com'
             }
         }
         cleanup {
