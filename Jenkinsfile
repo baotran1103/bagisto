@@ -47,13 +47,13 @@ pipeline {
 DB_HOST=mysql
 DB_PORT=3306
 DB_DATABASE=bagisto_testing
-DB_USERNAME=${DB_USERNAME}
-DB_PASSWORD=${DB_PASSWORD}
+DB_USERNAME=\${DB_USERNAME}
+DB_PASSWORD=\${DB_PASSWORD}
 
 # Testing Environment
 APP_ENV=testing
 APP_DEBUG=false
-APP_KEY=base64:$(openssl rand -base64 32)
+APP_KEY=base64:\$(openssl rand -base64 32)
 EOF
                         
                         echo "✓ Environment configured with secure credentials"
