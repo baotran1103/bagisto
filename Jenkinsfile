@@ -82,6 +82,10 @@ pipeline {
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
+                                # Create required Laravel directories
+                                mkdir -p bootstrap/cache
+                                chmod -R 775 bootstrap/cache
+                                
                                 # Run pure unit tests - no Laravel boot required
                                 php artisan test tests/Unit/CoreHelpersTest.php --stop-on-failure
                             '''
@@ -95,25 +99,30 @@ pipeline {
                         unstash 'source-code'
                         dir('bagisto-app') {
                             script {
-                                // Use SonarQube Plugin instead of Docker container
-                                def scannerHome = tool 'SonarScanner'
-                                withSonarQubeEnv('SonarQube') {
-                                    sh """
-                                        ${scannerHome}/bin/sonar-scanner \\
-                                            -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.projectName=Bagisto \\
-                                            -Dsonar.sources=app,packages/Webkul \\
-                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
-                                            -Dsonar.sourceEncoding=UTF-8
-                                    """
-                                }
-                                
-                                // Wait for Quality Gate
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    def qg = waitForQualityGate()
-                                    if (qg.status != 'OK') {
-                                        echo "⚠️ Quality Gate failed: ${qg.status}"
+                                try {
+                                    // Use SonarQube Plugin - requires SonarQube server setup
+                                    def scannerHome = tool 'SonarScanner'
+                                    withSonarQubeEnv('SonarQube') {
+                                        sh """
+                                            ${scannerHome}/bin/sonar-scanner \\
+                                                -Dsonar.projectKey=bagisto \\
+                                                -Dsonar.projectName=Bagisto \\
+                                                -Dsonar.sources=app,packages/Webkul \\
+                                                -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
+                                                -Dsonar.sourceEncoding=UTF-8
+                                        """
                                     }
+                                    
+                                    // Wait for Quality Gate
+                                    timeout(time: 5, unit: 'MINUTES') {
+                                        def qg = waitForQualityGate()
+                                        if (qg.status != 'OK') {
+                                            echo "⚠️ Quality Gate failed: ${qg.status}"
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    echo "⚠️ SonarQube analysis skipped: ${e.message}"
+                                    echo "💡 Tip: Configure SonarQube server in Jenkins System Configuration"
                                 }
                             }
                         }
