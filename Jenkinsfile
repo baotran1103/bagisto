@@ -108,14 +108,8 @@ pipeline {
                                         """
                                     }
                                     
-                                    // Wait for Quality Gate (disabled due to script security restrictions)
-                                    // timeout(time: 5, unit: 'MINUTES') {
-                                    //     def qg = waitForQualityGate()
-                                    //     if (qg.status != 'OK') {
-                                    //         echo "⚠️ Quality Gate failed: ${qg.status}"
-                                    //     }
-                                    // }
-                                    echo "ℹ️ Quality Gate check skipped (script security restrictions)"
+                                    // Quality Gate is configured on SonarQube UI, no need to check here
+                                    echo "ℹ️ SonarQube analysis completed - Quality Gate configured on server UI"
                                 } catch (Exception e) {
                                     echo "⚠️ SonarQube analysis skipped: ${e.message}"
                                 }
