@@ -71,9 +71,9 @@ build_app() {
     git pull origin main
 
     # Generate app key if not exists
-    if ! grep -q "APP_KEY=" .env.staging; then
+    if ! grep -q "APP_KEY=" deploy/.env.staging; then
         APP_KEY=$(docker run --rm php:8.2-cli php -r "echo 'base64:' . base64_encode(random_bytes(32));")
-        sed -i "s/APP_KEY=/APP_KEY=$APP_KEY/" .env.staging
+        sed -i "s/APP_KEY=/APP_KEY=$APP_KEY/" deploy/.env.staging
     fi
 
     # Build and start services
