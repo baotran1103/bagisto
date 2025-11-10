@@ -14,8 +14,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 PROJECT_NAME="bagisto-staging"
-DEPLOY_DIR="/opt/bagisto-staging"
-BACKUP_DIR="/opt/bagisto-backups"
+DEPLOY_DIR="$HOME/bagisto-staging"
+BACKUP_DIR="$HOME/bagisto-backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Functions
@@ -142,8 +142,8 @@ rollback_app() {
     # Restore files
     log_info "Restoring files..."
     rm -rf $DEPLOY_DIR
-    mkdir -p /opt
-    tar -xzf $LATEST_BACKUP -C /opt
+    mkdir -p $HOME
+    tar -xzf $LATEST_BACKUP -C $HOME
 
     # Restore database
     if [ -n "$LATEST_DB_BACKUP" ]; then
