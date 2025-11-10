@@ -1,4 +1,4 @@
 .configs/data/elasticsearch-data
 .configs/data/mysql-data
 .configs/data/redis-data
-workspace
+# workspace - commented out to allow Bagisto code in build context
