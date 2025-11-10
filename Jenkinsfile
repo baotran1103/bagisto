@@ -82,7 +82,6 @@ pipeline {
                         unstash 'backend-deps'
                         dir('bagisto-app') {
                             sh '''
-                                # Run pure unit tests directly with Pest - no Laravel boot needed
                                 ./vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure
                             '''
                         }
@@ -109,16 +108,16 @@ pipeline {
                                         """
                                     }
                                     
-                                    // Wait for Quality Gate
-                                    timeout(time: 5, unit: 'MINUTES') {
-                                        def qg = waitForQualityGate()
-                                        if (qg.status != 'OK') {
-                                            echo "⚠️ Quality Gate failed: ${qg.status}"
-                                        }
-                                    }
+                                    // Wait for Quality Gate (disabled due to script security restrictions)
+                                    // timeout(time: 5, unit: 'MINUTES') {
+                                    //     def qg = waitForQualityGate()
+                                    //     if (qg.status != 'OK') {
+                                    //         echo "⚠️ Quality Gate failed: ${qg.status}"
+                                    //     }
+                                    // }
+                                    echo "ℹ️ Quality Gate check skipped (script security restrictions)"
                                 } catch (Exception e) {
                                     echo "⚠️ SonarQube analysis skipped: ${e.message}"
-                                    echo "💡 Tip: Configure SonarQube server in Jenkins System Configuration"
                                 }
                             }
                         }
