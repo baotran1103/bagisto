@@ -46,11 +46,8 @@ RUN chown -R www-data:www-data /var/www/html \
 # Copy nginx configuration
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 
-# Copy supervisor configuration
-COPY ./deploy/supervisord.conf /etc/supervisord.conf
-
 # Expose ports
 EXPOSE 9000
 
-# Start supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Start PHP-FPM and Nginx
+CMD sh -c "php-fpm -D && nginx -g 'daemon off;'"
