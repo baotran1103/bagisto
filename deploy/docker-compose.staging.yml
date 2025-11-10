@@ -7,8 +7,6 @@ services:
       dockerfile: deploy/Dockerfile.prod
     container_name: bagisto-app
     restart: unless-stopped
-    env_file:
-      - deploy/.env.staging
     environment:
       - APP_ENV=staging
       - APP_KEY=${APP_KEY}
@@ -54,8 +52,6 @@ services:
     image: mysql:8.0
     container_name: bagisto-mysql
     restart: unless-stopped
-    env_file:
-      - deploy/.env.staging
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${DB_DATABASE}
@@ -103,8 +99,6 @@ services:
     image: grafana/grafana:latest
     container_name: bagisto-grafana
     restart: unless-stopped
-    env_file:
-      - deploy/.env.staging
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     ports:

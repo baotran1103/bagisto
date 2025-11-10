@@ -20,6 +20,11 @@ DEPLOY_DIR="$HOME/bagisto-staging"
 BACKUP_DIR="$HOME/bagisto-backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# Load environment variables from .env.staging
+if [ -f "$PROJECT_ROOT/deploy/.env.staging" ]; then
+    export $(grep -v '^#' "$PROJECT_ROOT/deploy/.env.staging" | xargs)
+fi
+
 # Functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
