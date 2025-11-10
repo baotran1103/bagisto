@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: bagisto-app
     container_name: bagisto-app
     restart: unless-stopped
     environment:
