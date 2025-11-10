@@ -15,5 +15,5 @@ scrape_configs:
       - targets: ['nginx-exporter:9113']
   - job_name: 'jenkins'
     static_configs:
-      - targets: ['jenkins:8081']
+      - targets: ['jenkins:8080']
     metrics_path: '/prometheus'
