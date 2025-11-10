@@ -95,20 +95,20 @@ pipeline {
                         dir('bagisto-app') {
                             script {
                                 try {
-                                    // SonarQube analysis disabled for debugging ClamAV
-                                    echo "ℹ️ SonarQube analysis skipped for debugging"
-                                    // def scannerHome = tool 'SonarScanner'
-                                    // withSonarQubeEnv('SonarQube') {
-                                    //     sh """
-                                    //         ${scannerHome}/bin/sonar-scanner \\
-                                    //             -Dsonar.projectKey=bagisto \\
-                                    //             -Dsonar.projectName=Bagisto \\
-                                    //             -Dsonar.sources=app,packages/Webkul \\
-                                    //             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
-                                    //             -Dsonar.sourceEncoding=UTF-8
-                                    //     """
-                                    // }
-                                    echo " SonarQube analysis completed"
+                                    // Use SonarQube Plugin
+                                    def scannerHome = tool 'SonarScanner'
+                                    withSonarQubeEnv('SonarQube') {
+                                        sh """
+                                            ${scannerHome}/bin/sonar-scanner \\
+                                                -Dsonar.projectKey=bagisto \\
+                                                -Dsonar.projectName=Bagisto \\
+                                                -Dsonar.sources=app,packages/Webkul \\
+                                                -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
+                                                -Dsonar.sourceEncoding=UTF-8
+                                        """
+                                    }
+                                    
+                                    echo "SonarQube analysis completed"
                                 } catch (Exception e) {
                                     echo "⚠️ SonarQube analysis skipped: ${e.message}"
                                 }
@@ -141,7 +141,6 @@ pipeline {
                                     args '-u root'
                                 }
                             }
-                            when { expression { false } } // Disabled for debugging
                             steps {
                                 unstash 'source-code'
                                 unstash 'backend-deps'
@@ -160,7 +159,6 @@ pipeline {
                                     args '-u root'
                                 }
                             }
-                            when { expression { false } } // Disabled for debugging
                             steps {
                                 unstash 'source-code'
                                 unstash 'frontend-build'
