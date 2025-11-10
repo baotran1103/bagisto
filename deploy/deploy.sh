@@ -45,6 +45,9 @@ check_root() {
 
 # Create backup
 create_backup() {
+    # Change to project root directory
+    cd ..
+
     log_info "Creating backup..."
     mkdir -p $BACKUP_DIR
 
@@ -57,7 +60,7 @@ create_backup() {
     # Backup files
     if [ -d "$DEPLOY_DIR" ]; then
         log_info "Backing up application files..."
-        tar -czf $BACKUP_DIR/files_backup_$TIMESTAMP.tar.gz -C /opt bagisto-staging
+        tar -czf $BACKUP_DIR/files_backup_$TIMESTAMP.tar.gz -C $HOME bagisto-staging
     fi
 
     log_success "Backup created: $BACKUP_DIR/${TIMESTAMP}"
@@ -66,6 +69,9 @@ create_backup() {
 # Build application
 build_app() {
     log_info "Building application..."
+
+    # Change to project root directory
+    cd ..
 
     # Pull latest changes
     git pull origin main
@@ -101,6 +107,9 @@ build_app() {
 deploy_app() {
     log_info "Starting deployment..."
 
+    # Change to project root directory
+    cd ..
+
     create_backup
 
     # Stop services
@@ -124,6 +133,9 @@ deploy_app() {
 # Rollback
 rollback_app() {
     log_info "Starting rollback..."
+
+    # Change to project root directory
+    cd ..
 
     # Find latest backup
     LATEST_BACKUP=$(ls -t $BACKUP_DIR/files_backup_*.tar.gz | head -1)
@@ -161,6 +173,9 @@ rollback_app() {
 
 # Show status
 show_status() {
+    # Change to project root directory
+    cd ..
+
     log_info "Application Status:"
     docker-compose -f deploy/docker-compose.staging.yml ps
 
