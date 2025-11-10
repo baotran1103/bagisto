@@ -36,25 +36,25 @@ services:
       - ./.configs/data/mysql-data:/var/lib/mysql/
       - ./workspace/:/var/www/html/
 
-  phpmyadmin:
-    image: phpmyadmin:latest
-    ports:
-      - 8080:80
-    environment:
-      PMA_HOST: ${PMA_HOST}
-      PMA_USER: ${PMA_USER}
-      PMA_PASSWORD: ${PMA_PASSWORD}
-      UPLOAD_LIMIT: ${PMA_UPLOAD_LIMIT}
-      MEMORY_LIMIT: ${PMA_MEMORY_LIMIT}
-      MAX_EXECUTION_TIME: ${PMA_MAX_EXECUTION_TIME}
+  # phpmyadmin:
+  #   image: phpmyadmin:latest
+  #   ports:
+  #     - 8080:80
+  #   environment:
+  #     PMA_HOST: ${PMA_HOST}
+  #     PMA_USER: ${PMA_USER}
+  #     PMA_PASSWORD: ${PMA_PASSWORD}
+  #     UPLOAD_LIMIT: ${PMA_UPLOAD_LIMIT}
+  #     MEMORY_LIMIT: ${PMA_MEMORY_LIMIT}
+  #     MAX_EXECUTION_TIME: ${PMA_MAX_EXECUTION_TIME}
 
-  redis:
-    image: redis:6.2-alpine
-    ports:
-      - 6379:6379
-    command: redis-server --save 20 1 --loglevel warning
-    volumes:
-      - ./.configs/data/redis-data:/data
+  # redis:
+  #   image: redis:6.2-alpine
+  #   ports:
+  #     - 6379:6379
+  #   command: redis-server --save 20 1 --loglevel warning
+  #   volumes:
+  #     - ./.configs/data/redis-data:/data
 
   # elasticsearch:
   #   image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
@@ -85,11 +85,11 @@ services:
   #   depends_on:
   #     - elasticsearch
 
-  mailpit:
-    image: "axllent/mailpit:latest"
-    ports:
-      - 8025:8025
-      - 1025:1025
+  # mailpit:
+  #   image: "axllent/mailpit:latest"
+  #   ports:
+  #     - 8025:8025
+  #     - 1025:1025
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -152,25 +152,25 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     depends_on:
       - prometheus
-  loki:
-      image: grafana/loki:3.0.0                   
-      container_name: loki                          
-      volumes:
-        - ./.configs/loki-config-official.yaml:/mnt/config/loki-config.yaml 
-        - ./.configs/data/loki-data:/tmp
-      ports:
-        - "3100:3100"                              
-      command: -config.file=/mnt/config/loki-config.yaml 
+  # loki:
+  #     image: grafana/loki:3.0.0                   
+  #     container_name: loki                          
+  #     volumes:
+  #       - ./.configs/loki-config-official.yaml:/mnt/config/loki-config.yaml 
+  #       - ./.configs/data/loki-data:/tmp
+  #     ports:
+  #       - "3100:3100"                              
+  #     command: -config.file=/mnt/config/loki-config.yaml 
 
-  promtail:
-    image: grafana/promtail:3.0.0                  
-    container_name: promtail                    
-    volumes:
-      - ./.configs/promtail-config-official.yaml:/mnt/config/promtail-config.yaml 
-      - ./workspace:/var/log/app                           
-    depends_on:
-      - loki                                      
-    command: -config.file=/mnt/config/promtail-config.yaml
+  # promtail:
+  #   image: grafana/promtail:3.0.0                  
+  #   container_name: promtail                    
+  #   volumes:
+  #     - ./.configs/promtail-config-official.yaml:/mnt/config/promtail-config.yaml 
+  #     - ./workspace:/var/log/app                           
+  #   depends_on:
+  #     - loki                                      
+  #   command: -config.file=/mnt/config/promtail-config.yaml
 
   sonarqube-db:
     image: postgres:15-alpine
