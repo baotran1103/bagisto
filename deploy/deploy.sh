@@ -77,22 +77,22 @@ build_app() {
     fi
 
     # Build and start services
-    docker-compose -f docker-compose.staging.yml build --no-cache
-    docker-compose -f docker-compose.staging.yml up -d
+    docker-compose -f deploy/docker-compose.staging.yml build --no-cache
+    docker-compose -f deploy/docker-compose.staging.yml up -d
 
     # Wait for services to be ready
     log_info "Waiting for services to be ready..."
     sleep 30
 
     # Run migrations and seeders
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan migrate --force
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan db:seed --force
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan storage:link
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan migrate --force
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan db:seed --force
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan storage:link
 
     # Clear and cache config
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan config:cache
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan route:cache
-    docker-compose -f docker-compose.staging.yml exec -T app php artisan view:cache
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan config:cache
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan route:cache
+    docker-compose -f deploy/docker-compose.staging.yml exec -T app php artisan view:cache
 
     log_success "Application built and deployed successfully"
 }
@@ -105,7 +105,7 @@ deploy_app() {
 
     # Stop services
     log_info "Stopping services..."
-    docker-compose -f docker-compose.staging.yml down
+    docker-compose -f deploy/docker-compose.staging.yml down
 
     # Deploy new version
     build_app
@@ -137,7 +137,7 @@ rollback_app() {
     log_info "Rolling back to backup: $(basename $LATEST_BACKUP)"
 
     # Stop services
-    docker-compose -f docker-compose.staging.yml down
+    docker-compose -f deploy/docker-compose.staging.yml down
 
     # Restore files
     log_info "Restoring files..."
@@ -148,13 +148,13 @@ rollback_app() {
     # Restore database
     if [ -n "$LATEST_DB_BACKUP" ]; then
         log_info "Restoring database..."
-        docker-compose -f docker-compose.staging.yml up -d mysql
+        docker-compose -f deploy/docker-compose.staging.yml up -d mysql
         sleep 10
-        docker-compose -f docker-compose.staging.yml exec -T mysql mysql -u root -p$MYSQL_ROOT_PASSWORD $DB_DATABASE < $LATEST_DB_BACKUP
+        docker-compose -f deploy/docker-compose.staging.yml exec -T mysql mysql -u root -p$MYSQL_ROOT_PASSWORD $DB_DATABASE < $LATEST_DB_BACKUP
     fi
 
     # Start services
-    docker-compose -f docker-compose.staging.yml up -d
+    docker-compose -f deploy/docker-compose.staging.yml up -d
 
     log_success "Rollback completed"
 }
@@ -162,7 +162,7 @@ rollback_app() {
 # Show status
 show_status() {
     log_info "Application Status:"
-    docker-compose -f docker-compose.staging.yml ps
+    docker-compose -f deploy/docker-compose.staging.yml ps
 
     log_info "Resource Usage:"
     docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
