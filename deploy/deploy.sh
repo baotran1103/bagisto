@@ -63,7 +63,9 @@ create_backup() {
     fi
 
     log_success "Backup created: $BACKUP_DIR/${TIMESTAMP}"
-}# Build application
+}
+
+# Build application
 build_app() {
     log_info "Building application..."
 
