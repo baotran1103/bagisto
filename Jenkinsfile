@@ -91,9 +91,6 @@ pipeline {
                 
                 stage('Code Quality Analysis') {
                     agent any
-                    when {
-                        expression { false } // Temporarily disabled
-                    }
                     steps {
                         unstash 'source-code'
                         dir('bagisto-app') {
@@ -132,9 +129,6 @@ pipeline {
                     stages {
                         stage('ClamAV Virus Scan') {
                             agent any
-                            when {
-                                expression { false } // Temporarily disabled
-                            }
                             steps {
                                 unstash 'source-code'
                                 dir('bagisto-app') {
