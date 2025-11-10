@@ -1,7 +1,10 @@
 version: '3.8'
 
+# Load environment variables from .env.staging
+env_file:
+  - deploy/.env.staging
+
 services:
-  # Application Services
   app:
     build:
       context: ..
