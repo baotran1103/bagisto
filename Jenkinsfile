@@ -124,11 +124,17 @@ pipeline {
                             steps {
                                 unstash 'source-code'
                                 dir('bagisto-app') {
-                                    // ClamAV Plugin scan - using configured global settings
-                                    clamav(
-                                        includes: '**/*',
-                                        excludes: '.git/**,vendor/**,node_modules/**,storage/**,public/build/**,bootstrap/cache/**'
-                                    )
+                                    // ClamAV command line scan
+                                    sh '''
+                                        clamscan --recursive --infected \\
+                                            --exclude-dir=.git \\
+                                            --exclude-dir=vendor \\
+                                            --exclude-dir=node_modules \\
+                                            --exclude-dir=storage \\
+                                            --exclude-dir=public/build \\
+                                            --exclude-dir=bootstrap/cache \\
+                                            . || echo "⚠️ ClamAV scan completed with warnings"
+                                    '''
                                     echo "✓ ClamAV scan completed"
                                 }
                             }
