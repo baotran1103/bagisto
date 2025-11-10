@@ -4,10 +4,11 @@ FROM php:8.2-fpm-alpine
 # Install system dependencies
 RUN apk add --no-cache \
     nginx \
-    supervisor \
     git \
     curl \
     libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
     libxml2-dev \
     libzip-dev \
     zip \
@@ -15,10 +16,12 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     mysql-client \
-    redis
+    redis \
+    oniguruma-dev
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
