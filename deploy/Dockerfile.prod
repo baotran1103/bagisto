@@ -30,14 +30,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first for better caching
-COPY workspace/bagisto/composer.json workspace/bagisto/composer.lock ./
+# Copy application code first
+COPY workspace/bagisto/ .
 
 # Install PHP dependencies (production optimized)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-
-# Copy application code
-COPY workspace/bagisto/ .
 
 # Install Node.js dependencies and build assets
 RUN npm install --production=false && npm run build
