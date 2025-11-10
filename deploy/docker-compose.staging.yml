@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.prod
+      dockerfile: ./deploy/Dockerfile.prod
     container_name: bagisto-app
     restart: unless-stopped
     environment:
