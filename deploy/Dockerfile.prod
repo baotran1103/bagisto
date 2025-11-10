@@ -1,0 +1,56 @@
+# Production Dockerfile for Bagisto
+FROM php:8.2-fpm-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    nginx \
+    supervisor \
+    git \
+    curl \
+    libpng-dev \
+    libxml2-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    nodejs \
+    npm \
+    mysql-client \
+    redis
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy composer files first for better caching
+COPY ../composer.json ../composer.lock ./
+
+# Install PHP dependencies (production optimized)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+# Copy application code
+COPY .. .
+
+# Install Node.js dependencies and build assets
+RUN npm install --production=false && npm run build
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/storage \
+    && chmod -R 755 /var/www/html/bootstrap/cache
+
+# Copy nginx configuration
+COPY deploy/nginx.conf /etc/nginx/nginx.conf
+
+# Copy supervisor configuration
+COPY deploy/supervisord.conf /etc/supervisord.conf
+
+# Expose ports
+EXPOSE 9000
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

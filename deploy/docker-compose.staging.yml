@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # Application Services
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.prod
+    container_name: bagisto-app
+    restart: unless-stopped
+    environment:
+      - APP_ENV=staging
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - bagisto-network
+
+  # Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: bagisto-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./storage:/var/www/html/storage:ro
+    depends_on:
+      - app
+    networks:
+      - bagisto-network
+
+  # Database
+  mysql:
+    image: mysql:8.0
+    container_name: bagisto-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/my.cnf:ro
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - bagisto-network
+
+  # Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: bagisto-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - bagisto-network
+
+  # Monitoring (Lightweight)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bagisto-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - bagisto-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bagisto-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - bagisto-network
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: bagisto-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    networks:
+      - bagisto-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  bagisto-network:
+    driver: bridge
