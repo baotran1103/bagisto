@@ -107,9 +107,7 @@ pipeline {
                                                 -Dsonar.sourceEncoding=UTF-8
                                         """
                                     }
-                                    
-                                    // Quality Gate is configured on SonarQube UI, no need to check here
-                                    echo "ℹ️ SonarQube analysis completed - Quality Gate configured on server UI"
+                                    echo " SonarQube analysis completed"
                                 } catch (Exception e) {
                                     echo "⚠️ SonarQube analysis skipped: ${e.message}"
                                 }
