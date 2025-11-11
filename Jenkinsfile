@@ -76,7 +76,7 @@ pipeline {
                     }
                     steps {
                         dir('workspace/bagisto') {
-                            sh './vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure'
+                            sh './vendor/bin/pest --stop-on-failure'
                         }
                     }
                 }
@@ -145,7 +145,7 @@ pipeline {
                                             script: '''
                                                 apt-get update && apt-get install -y git unzip
                                                 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-                                                composer audit --no-dev --min-level=high
+                                                composer audit --no-dev
                                             ''',
                                             returnStdout: true
                                         ).trim()
