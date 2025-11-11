@@ -16,7 +16,7 @@ pipeline {
             steps {
                 git branch: 'main',
                     credentialsId: 'GITHUB_PAT',
-                    url: 'https://github.com/baotran1103/bagisto-app.git'
+                    url: 'https://github.com/baotran1103/bagisto.git'
                 
                 script {
                     env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
@@ -35,7 +35,9 @@ pipeline {
                         }
                     }
                     steps {
-                        sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                        dir('workspace/bagisto') {
+                            sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                        }
                     }
                 }
                 
@@ -47,10 +49,12 @@ pipeline {
                         }
                     }
                     steps {
-                        sh '''
-                            npm ci --prefer-offline
-                            npm run build
-                        '''
+                        dir('workspace/bagisto') {
+                            sh '''
+                                npm ci --prefer-offline
+                                npm run build
+                            '''
+                        }
                     }
                 }
             }
@@ -66,7 +70,9 @@ pipeline {
                         }
                     }
                     steps {
-                        sh './vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure'
+                        dir('workspace/bagisto') {
+                            sh './vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure'
+                        }
                     }
                 }
                 
@@ -120,29 +126,29 @@ pipeline {
                     }
                 }
                 
-                stage('Composer Audit') {
-                    agent {
-                        docker { 
-                            image 'composer:latest'
-                            args '-u root'
-                        }
-                    }
-                    steps {
-                        script {
-                            def result = sh(
-                                script: 'composer audit --no-dev',
-                                returnStatus: true
-                            )
-                            if (result != 0) {
-                                error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
-                            } else {
-                                echo "✅ No PHP vulnerabilities"
+                        stage('Composer Audit') {
+                            agent {
+                                docker { 
+                                    image 'composer:latest'
+                                    args '-u root'
+                                }
                             }
-                        }
-                    }
-                }
-                
-                stage('NPM Audit') {
+                            steps {
+                                dir('workspace/bagisto') {
+                                    script {
+                                        def result = sh(
+                                            script: 'composer audit --no-dev',
+                                            returnStatus: true
+                                        )
+                                        if (result != 0) {
+                                            error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                        } else {
+                                            echo "✅ No PHP vulnerabilities"
+                                        }
+                                    }
+                                }
+                            }
+                        }                stage('NPM Audit') {
                     agent {
                         docker { 
                             image 'node:18-alpine'
@@ -150,15 +156,17 @@ pipeline {
                         }
                     }
                     steps {
-                        script {
-                            def result = sh(
-                                script: 'npm audit --audit-level=moderate',
-                                returnStatus: true
-                            )
-                            if (result != 0) {
-                                error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
-                            } else {
-                                echo "✅ No Node vulnerabilities"
+                        dir('workspace/bagisto') {
+                            script {
+                                def result = sh(
+                                    script: 'npm audit --audit-level=moderate',
+                                    returnStatus: true
+                                )
+                                if (result != 0) {
+                                    error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
+                                } else {
+                                    echo "✅ No Node vulnerabilities"
+                                }
                             }
                         }
                     }
