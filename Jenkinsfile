@@ -14,6 +14,7 @@ pipeline {
         stage('Checkout') {
             agent any
             steps {
+                sh 'git config --global http.postBuffer 524288000'
                 git branch: 'main',
                     credentialsId: 'GITHUB_PAT',
                     url: 'https://github.com/baotran1103/bagisto.git'
@@ -265,10 +266,10 @@ pipeline {
                 Build Summary
                 ═══════════════════════════════════════
                 Build: #${BUILD_NUMBER}
-                Commit: ${GIT_COMMIT}
+                Commit: ${env.GIT_COMMIT ?: 'unknown'}
                 Status: ${currentBuild.result ?: 'SUCCESS'}
                 Duration: ${currentBuild.durationString}
-                Image: ${DOCKER_IMAGE}:${BUILD_TAG}
+                Image: ${env.BUILD_TAG ?: "${BUILD_NUMBER}-unknown"}
                 ═══════════════════════════════════════
                 """
             }
@@ -280,12 +281,12 @@ pipeline {
                         body: """
                         🎉 Build completed successfully!
                         
-                        📦 Docker Image: ${DOCKER_IMAGE}:${BUILD_TAG}
-                        📝 Commit: ${GIT_COMMIT}
+                        📦 Docker Image: ${env.BUILD_TAG ?: "${BUILD_NUMBER}-unknown"}
+                        📝 Commit: ${env.GIT_COMMIT ?: 'unknown'}
                         ⏱️ Duration: ${currentBuild.durationString}
                         
                         � Deploy Command:
-                        docker pull ${DOCKER_IMAGE}:${BUILD_TAG}
+                        docker pull ${env.BUILD_TAG ?: "${BUILD_NUMBER}-unknown"}
                         docker-compose up -d
                         
                         🔗 Jenkins: ${BUILD_URL}
@@ -300,7 +301,7 @@ pipeline {
                         body: """
                         🚨 Build failed!
                         
-                        📝 Commit: ${GIT_COMMIT}
+                        📝 Commit: ${env.GIT_COMMIT ?: 'unknown'}
                         ⏱️ Duration: ${currentBuild.durationString}
                         
                         🔗 Check logs: ${BUILD_URL}
