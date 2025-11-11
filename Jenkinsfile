@@ -101,68 +101,64 @@ pipeline {
                     }
                 }
                 
-                stage('Security Scans') {
-                    parallel {
-                        stage('ClamAV Malware Scan') {
-                            agent any
-                            steps {
-                                script {
-                                    def result = sh(
-                                        script: 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules .',
-                                        returnStatus: true
-                                    )
-                                    if (result == 1) {
-                                        error "❌ CRITICAL: Malware/virus detected! Build aborted."
-                                    } else if (result != 0) {
-                                        echo "⚠️ ClamAV completed with warnings"
-                                    } else {
-                                        echo "✅ No malware detected"
-                                    }
-                                }
+                stage('ClamAV Malware Scan') {
+                    agent any
+                    steps {
+                        script {
+                            def result = sh(
+                                script: 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules .',
+                                returnStatus: true
+                            )
+                            if (result == 1) {
+                                error "❌ CRITICAL: Malware/virus detected! Build aborted."
+                            } else if (result != 0) {
+                                echo "⚠️ ClamAV completed with warnings"
+                            } else {
+                                echo "✅ No malware detected"
                             }
                         }
-                        
-                        stage('Composer Audit') {
-                            agent {
-                                docker { 
-                                    image 'composer:latest'
-                                    args '-u root'
-                                }
-                            }
-                            steps {
-                                script {
-                                    def result = sh(
-                                        script: 'composer audit --no-dev',
-                                        returnStatus: true
-                                    )
-                                    if (result != 0) {
-                                        error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
-                                    } else {
-                                        echo "✅ No PHP vulnerabilities"
-                                    }
-                                }
+                    }
+                }
+                
+                stage('Composer Audit') {
+                    agent {
+                        docker { 
+                            image 'composer:latest'
+                            args '-u root'
+                        }
+                    }
+                    steps {
+                        script {
+                            def result = sh(
+                                script: 'composer audit --no-dev',
+                                returnStatus: true
+                            )
+                            if (result != 0) {
+                                error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                            } else {
+                                echo "✅ No PHP vulnerabilities"
                             }
                         }
-                        
-                        stage('NPM Audit') {
-                            agent {
-                                docker { 
-                                    image 'node:18-alpine'
-                                    args '-u root'
-                                }
-                            }
-                            steps {
-                                script {
-                                    def result = sh(
-                                        script: 'npm audit --audit-level=moderate',
-                                        returnStatus: true
-                                    )
-                                    if (result != 0) {
-                                        error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
-                                    } else {
-                                        echo "✅ No Node vulnerabilities"
-                                    }
-                                }
+                    }
+                }
+                
+                stage('NPM Audit') {
+                    agent {
+                        docker { 
+                            image 'node:18-alpine'
+                            args '-u root'
+                        }
+                    }
+                    steps {
+                        script {
+                            def result = sh(
+                                script: 'npm audit --audit-level=moderate',
+                                returnStatus: true
+                            )
+                            if (result != 0) {
+                                error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
+                            } else {
+                                echo "✅ No Node vulnerabilities"
                             }
                         }
                     }
