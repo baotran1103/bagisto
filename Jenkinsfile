@@ -8,8 +8,6 @@ pipeline {
     environment {
         DOCKER_IMAGE = "bao110304/bagisto"
         CI_IMAGE = "bao110304/bagisto-ci:latest"
-        GIT_SHORT_COMMIT = "${GIT_COMMIT?.take(7) ?: 'unknown'}"
-        BUILD_TAG = "${BUILD_NUMBER}-${GIT_SHORT_COMMIT}"
     }
 
     stages {
@@ -20,6 +18,12 @@ pipeline {
                 git branch: 'main',
                     credentialsId: 'GITHUB_PAT',
                     url: 'https://github.com/baotran1103/bagisto.git'
+                
+                script {
+                    env.GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.BUILD_TAG = "${BUILD_NUMBER}-${env.GIT_SHORT_COMMIT}"
+                    echo "Build tag: ${env.BUILD_TAG}"
+                }
             }
         }
         
@@ -186,7 +190,7 @@ pipeline {
             agent any
             steps {
                 script {
-                    def imageName = "${DOCKER_IMAGE}:${BUILD_TAG}"
+                    def imageName = "${DOCKER_IMAGE}:${env.BUILD_TAG}"
                     def imageLatest = "${DOCKER_IMAGE}:latest"
                     
                     sh """
@@ -225,12 +229,12 @@ pipeline {
                     )]) {
                         sh """
                             echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                            docker push ${DOCKER_IMAGE}:${BUILD_TAG}
+                            docker push ${DOCKER_IMAGE}:${env.BUILD_TAG}
                             docker push ${DOCKER_IMAGE}:latest
                         """
                     }
                     
-                    echo "✅ Image pushed: ${DOCKER_IMAGE}:${BUILD_TAG}"
+                    echo "✅ Image pushed: ${DOCKER_IMAGE}:${env.BUILD_TAG}"
                 }
             }
         }
