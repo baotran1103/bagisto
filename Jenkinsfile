@@ -138,10 +138,21 @@ pipeline {
                             }
                             steps {
                                 dir('workspace/bagisto') {
-                                    sh '''
-                                        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-                                        composer audit --no-dev || echo "⚠️ Composer vulnerabilities found, but continuing..."
-                                    '''
+                                    script {
+                                        def auditOutput = sh(
+                                            script: '''
+                                                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                                                composer audit --no-dev --min-level=high
+                                            ''',
+                                            returnStdout: true
+                                        ).trim()
+                                        
+                                        if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
+                                            error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                        } else {
+                                            echo "✅ No PHP vulnerabilities (moderate+)"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -157,7 +168,7 @@ pipeline {
                         dir('workspace/bagisto') {
                             script {
                                 def result = sh(
-                                    script: 'npm i --package-lock-only && npm audit --audit-level=moderate',
+                                    script: 'npm audit --audit-level=moderate',
                                     returnStatus: true
                                 )
                                 if (result != 0) {
