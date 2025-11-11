@@ -181,7 +181,7 @@ pipeline {
                         docker build \
                             -t ${imageName} \
                             -t ${imageLatest} \
-                            -f Dockerfile.production \
+                            -f deploy/Dockerfile.production \
                             .
                     """
                     
