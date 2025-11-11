@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE = "baotran1103/bagisto"
+        DOCKER_IMAGE = "bao110304/bagisto"
         BUILD_TAG = "${BUILD_NUMBER}-${GIT_COMMIT}"
     }
 
