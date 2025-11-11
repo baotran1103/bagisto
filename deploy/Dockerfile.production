@@ -28,16 +28,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /build
 
-# Copy dependency files
-COPY composer.json composer.lock ./
-COPY package.json package-lock.json ./
+# Copy dependency files from workspace/bagisto
+COPY workspace/bagisto/composer.json workspace/bagisto/composer.lock ./
+COPY workspace/bagisto/package.json workspace/bagisto/package-lock.json ./
 
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction && \
     npm ci --prefer-offline
 
 # Copy source code
-COPY . .
+COPY workspace/bagisto/ .
 
 # Build frontend assets
 RUN npm run build && rm -rf node_modules
