@@ -148,7 +148,7 @@ pipeline {
                             }
                         }
                     }
-                }                }
+                }
                 
                 stage('NPM Audit') {
                     agent {
