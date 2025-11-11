@@ -5,64 +5,52 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
+    environment {
+        DOCKER_IMAGE = "baotran1103/bagisto"
+        BUILD_TAG = "${BUILD_NUMBER}-${GIT_COMMIT}"
+    }
+
     stages {
         stage('Checkout') {
             agent any
             steps {
+                git branch: 'main',
+                    credentialsId: 'GITHUB_PAT',
+                    url: 'https://github.com/baotran1103/bagisto-app.git'
+                
                 script {
-                    dir('bagisto-app') {
-                        git branch: 'main',
-                            credentialsId: 'GITHUB_PAT',
-                            url: 'https://github.com/baotran1103/bagisto-app.git'
-                        
-                        env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        env.GIT_BRANCH = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                    }
-                    stash name: 'source-code', includes: 'bagisto-app/**'
+                    env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.BUILD_TAG = "${BUILD_NUMBER}-${env.GIT_COMMIT}"
                 }
             }
         }
         
-        stage('Parallel Build') {
+        stage('Build Code') {
             parallel {
-                stage('Backend Dependencies') {
+                stage('Backend Build') {
                     agent {
                         docker {
-                            image 'php-fpm:latest'
+                            image 'composer:latest'
                             args '-u root'
                         }
                     }
                     steps {
-                        unstash 'source-code'
-                        dir('bagisto-app') {
-                            sh '''
-                                composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress || echo "⚠️ Composer install completed with warnings"
-                                echo "✓ Composer packages installed"
-                            '''
-                        }
-                        stash name: 'backend-deps', includes: 'bagisto-app/vendor/**'
+                        sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
                     }
                 }
                 
-                stage('Frontend Dependencies & Build') {
+                stage('Frontend Build') {
                     agent {
                         docker {
-                            image 'php-fpm:latest'
+                            image 'node:18-alpine'
                             args '-u root'
                         }
                     }
                     steps {
-                        unstash 'source-code'
-                        dir('bagisto-app') {
-                            sh '''
-                                npm install --quiet
-                                
-                                npm run build
-                                
-                                echo "✓ Frontend built successfully"
-                            '''
-                        }
-                        stash name: 'frontend-build', includes: 'bagisto-app/public/build/**,bagisto-app/node_modules/**'
+                        sh '''
+                            npm ci --prefer-offline
+                            npm run build
+                        '''
                     }
                 }
             }
@@ -73,106 +61,66 @@ pipeline {
                 stage('PHPUnit Tests') {
                     agent {
                         docker {
-                            image 'php-fpm:latest'
+                            image 'php:8.2'
                             args '-u root'
                         }
                     }
                     steps {
-                        unstash 'source-code'
-                        unstash 'backend-deps'
-                        dir('bagisto-app') {
-                            sh '''
-                                ./vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure
-                            '''
-                        }
+                        sh './vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure'
                     }
                 }
                 
-                stage('Code Quality Analysis') {
+                stage('Code Quality') {
                     agent any
                     steps {
-                        unstash 'source-code'
-                        dir('bagisto-app') {
-                            script {
-                                try {
-                                    // Use SonarQube Plugin
-                                    def scannerHome = tool 'SonarScanner'
-                                    withSonarQubeEnv('SonarQube') {
-                                        sh """
-                                            ${scannerHome}/bin/sonar-scanner \\
-                                                -Dsonar.projectKey=bagisto \\
-                                                -Dsonar.projectName=Bagisto \\
-                                                -Dsonar.sources=app,packages/Webkul \\
-                                                -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**,bootstrap/cache/** \\
-                                                -Dsonar.sourceEncoding=UTF-8
-                                        """
-                                    }
-                                    
-                                    echo "SonarQube analysis completed"
-                                } catch (Exception e) {
-                                    echo "⚠️ SonarQube analysis skipped: ${e.message}"
+                        script {
+                            try {
+                                def scannerHome = tool 'SonarScanner'
+                                withSonarQubeEnv('SonarQube') {
+                                    sh """
+                                        ${scannerHome}/bin/sonar-scanner \\
+                                            -Dsonar.projectKey=bagisto \\
+                                            -Dsonar.sources=app,packages/Webkul \\
+                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
+                                    """
                                 }
+                            } catch (Exception e) {
+                                echo "⚠️ SonarQube skipped: ${e.message}"
                             }
                         }
                     }
                 }
                 
-                stage('Security Audits') {
-                    stages {
-                        stage('ClamAV Virus Scan') {
+                stage('Security Scans') {
+                    parallel {
+                        stage('ClamAV') {
                             agent any
                             steps {
-                                unstash 'source-code'
-                                dir('bagisto-app') {
-                                    // ClamAV command line scan
-                                    sh '''
-                                        clamscan --recursive --infected \\
-                                            --exclude-dir=.git \\
-                                            --exclude-dir=vendor \\
-                                            --exclude-dir=node_modules \\
-                                            --exclude-dir=storage \\
-                                            --exclude-dir=public/build \\
-                                            --exclude-dir=bootstrap/cache \\
-                                            . || echo "⚠️ ClamAV scan completed with warnings"
-                                    '''
-                                    echo "✓ ClamAV scan completed"
-                                }
+                                sh 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules . || echo "⚠️ ClamAV warnings"'
                             }
                         }
                         
                         stage('Composer Audit') {
                             agent {
                                 docker { 
-                                    image 'php-fpm:latest'
+                                    image 'composer:latest'
                                     args '-u root'
                                 }
                             }
                             steps {
-                                unstash 'source-code'
-                                unstash 'backend-deps'
-                                dir('bagisto-app') {
-                                    sh '''
-                                        composer audit || echo "⚠️ PHP vulnerabilities found"
-                                    '''
-                                }
+                                sh 'composer audit || echo "⚠️ PHP vulnerabilities found"'
                             }
                         }
                         
                         stage('NPM Audit') {
                             agent {
                                 docker { 
-                                    image 'php-fpm:latest'
+                                    image 'node:18-alpine'
                                     args '-u root'
                                 }
                             }
                             steps {
-                                unstash 'source-code'
-                                unstash 'frontend-build'
-                                dir('bagisto-app') {
-                                    sh '''
-                                        npm audit --audit-level=moderate || echo "⚠️ Node vulnerabilities found"
-                                    '''
-                                }
+                                sh 'npm audit --audit-level=moderate || echo "⚠️ Node vulnerabilities found"'
                             }
                         }
                     }
@@ -180,31 +128,57 @@ pipeline {
             }
         }
         
-        stage('Create Deployment Package') {
+        stage('Build Docker Image') {
             agent any
             steps {
-                unstash 'source-code'
-                unstash 'backend-deps'
-                unstash 'frontend-build'
-                
-                dir('bagisto-app') {
-                    sh '''
-                        ARTIFACT_NAME="bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
-                        tar -czf "../${ARTIFACT_NAME}" \\
-                            --exclude=node_modules \\
-                            --exclude=.git \\
-                            --exclude=tests \\
-                            --exclude=storage/logs/* \\
-                            --exclude=*.tar.gz \\
+                script {
+                    def imageName = "${DOCKER_IMAGE}:${BUILD_TAG}"
+                    def imageLatest = "${DOCKER_IMAGE}:latest"
+                    
+                    sh """
+                        docker build \
+                            -t ${imageName} \
+                            -t ${imageLatest} \
+                            -f Dockerfile.production \
                             .
-                        
-                        echo "✓ Build artifact: ${ARTIFACT_NAME}"
-                        ls -lh "../${ARTIFACT_NAME}"
-                        tar -tzf "../${ARTIFACT_NAME}" | head -10
-                    '''
+                    """
+                    
+                    echo "✅ Docker image built: ${imageName}"
                 }
-                
-                archiveArtifacts artifacts: 'bagisto-*.tar.gz', fingerprint: true, allowEmptyArchive: false
+            }
+        }
+        
+        stage('Image Security Scan') {
+            agent any
+            steps {
+                script {
+                    try {
+                        sh "docker scan ${DOCKER_IMAGE}:${BUILD_TAG} || echo '⚠️ Security scan completed with warnings'"
+                    } catch (Exception e) {
+                        echo "⚠️ Image scan skipped: ${e.message}"
+                    }
+                }
+            }
+        }
+        
+        stage('Push to Docker Hub') {
+            agent any
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                            echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                            docker push ${DOCKER_IMAGE}:${BUILD_TAG}
+                            docker push ${DOCKER_IMAGE}:latest
+                        """
+                    }
+                    
+                    echo "✅ Image pushed: ${DOCKER_IMAGE}:${BUILD_TAG}"
+                }
             }
         }
     }
@@ -212,68 +186,57 @@ pipeline {
     post {
         always {
             node('') {
-                echo '=== Pipeline Execution Completed ==='
                 echo """
-                Build Summary:
-                - Build Number: ${BUILD_NUMBER}
-                - Git Commit: ${GIT_COMMIT}
-                - Git Branch: ${GIT_BRANCH}
-                - Status: ${currentBuild.result ?: 'SUCCESS'}
-                - Duration: ${currentBuild.durationString}
-                - Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz
+                ═══════════════════════════════════════
+                Build Summary
+                ═══════════════════════════════════════
+                Build: #${BUILD_NUMBER}
+                Commit: ${GIT_COMMIT}
+                Status: ${currentBuild.result ?: 'SUCCESS'}
+                Duration: ${currentBuild.durationString}
+                Image: ${DOCKER_IMAGE}:${BUILD_TAG}
+                ═══════════════════════════════════════
                 """
             }
         }
+        
         success {
             node('') {
-                echo '✅ Pipeline completed successfully!'
-                echo '🚀 Artifact ready for deployment'
-                echo "📦 Download: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz"
-                
-                emailext subject: "✅ Build Success: Bagisto ${BUILD_NUMBER}",
+                emailext subject: "✅ Build Success: Bagisto #${BUILD_NUMBER}",
                         body: """
                         🎉 Build completed successfully!
                         
-                        Build Details:
-                        - Build Number: ${BUILD_NUMBER}
-                        - Git Commit: ${GIT_COMMIT}
-                        - Git Branch: ${GIT_BRANCH}
-                        - Duration: ${currentBuild.durationString}
+                        📦 Docker Image: ${DOCKER_IMAGE}:${BUILD_TAG}
+                        📝 Commit: ${GIT_COMMIT}
+                        ⏱️ Duration: ${currentBuild.durationString}
                         
-                        📦 Artifact: bagisto-${BUILD_NUMBER}-${GIT_COMMIT}.tar.gz
+                        � Deploy Command:
+                        docker pull ${DOCKER_IMAGE}:${BUILD_TAG}
+                        docker-compose up -d
                         
-                        🔗 Jenkins Build: ${BUILD_URL}
-                        
-                        Ready for deployment!
+                        🔗 Jenkins: ${BUILD_URL}
                         """,
                         to: 'tnqbao11@gmail.com'
             }
         }
+        
         failure {
             node('') {
-                echo '❌ Pipeline failed! Check logs above for details.'
-                echo '🔄 Rollback: Use previous successful build artifact'
-                
-                emailext subject: "❌ Build Failed: Bagisto ${BUILD_NUMBER}",
+                emailext subject: "❌ Build Failed: Bagisto #${BUILD_NUMBER}",
                         body: """
                         🚨 Build failed!
                         
-                        Build Details:
-                        - Build Number: ${BUILD_NUMBER}
-                        - Git Commit: ${GIT_COMMIT}
-                        - Git Branch: ${GIT_BRANCH}
-                        - Duration: ${currentBuild.durationString}
+                        📝 Commit: ${GIT_COMMIT}
+                        ⏱️ Duration: ${currentBuild.durationString}
                         
-                        🔗 Jenkins Build: ${BUILD_URL}
-                        
-                        Please check the build logs for details and fix the issues.
+                        🔗 Check logs: ${BUILD_URL}
                         """,
                         to: 'tnqbao11@gmail.com'
             }
         }
+        
         cleanup {
             node('') {
-                echo '=== Cleaning up workspace ==='
                 cleanWs(deleteDirs: true, disableDeferredWipeout: true, notFailBuild: true)
             }
         }
