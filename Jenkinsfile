@@ -58,6 +58,7 @@ pipeline {
                                 npm run build
                             '''
                         }
+                        stash name: 'node-lockfile', includes: 'workspace/bagisto/package-lock.json'
                     }
                 }
             }
@@ -165,6 +166,7 @@ pipeline {
                         }
                     }
                     steps {
+                        unstash 'node-lockfile'
                         dir('workspace/bagisto') {
                             script {
                                 def result = sh(
