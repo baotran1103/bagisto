@@ -144,7 +144,9 @@ pipeline {
                                     '''
                                 }
                             }
-                        }                stage('NPM Audit') {
+                        }
+                
+                stage('NPM Audit') {
                     agent {
                         docker { 
                             image 'node:18-alpine'
