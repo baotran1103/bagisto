@@ -18,3 +18,5 @@ Thumbs.db
 # Ignore workspace bagisto build artifacts and dependencies
 workspace/bagisto/vendor/
 workspace/bagisto/node_modules/
+!workspace/bagisto/package-lock.json
+!workspace/bagisto/composer.lock

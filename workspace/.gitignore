@@ -1,2 +1,6 @@
 *
 !.gitignore
+!bagisto/package-lock.json
+!bagisto/composer.lock
+!bagisto/package.json
+!bagisto/composer.json
