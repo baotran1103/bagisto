@@ -156,7 +156,6 @@ pipeline {
                                         }
                                         */
                                         
-                                        // New logic: auto pass, just echo if vulnerabilities found
                                         echo "Checking for PHP vulnerabilities..."
                                         if (auditOutput.contains('Severity:')) {
                                             echo "⚠️ PHP vulnerabilities found: ${auditOutput}"
@@ -191,7 +190,6 @@ pipeline {
                                 }
                                 */
                                 
-                                // New logic: auto pass, just echo if vulnerabilities found
                                 echo "Checking for Node vulnerabilities..."
                                 if (result != 0) {
                                     echo "⚠️ Node vulnerabilities found"
