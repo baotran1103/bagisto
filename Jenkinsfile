@@ -30,13 +30,16 @@ pipeline {
                 stage('Backend Build') {
                     agent {
                         docker {
-                            image 'composer:latest'
+                            image 'php:8.2-cli'
                             args '-u root'
                         }
                     }
                     steps {
                         dir('workspace/bagisto') {
-                            sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                            sh '''
+                                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                                composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-calendar --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql --ignore-platform-req=ext-gd
+                            '''
                         }
                     }
                 }
@@ -126,31 +129,22 @@ pipeline {
                     }
                 }
                 
-                stage('Composer Audit') {
-                    agent {
-                        docker { 
-                            image 'composer:latest'
-                            args '-u root'
-                        }
-                    }
-                    steps {
-                        dir('workspace/bagisto') {
-                            script {
-                                def result = sh(
-                                    script: 'composer audit --no-dev',
-                                    returnStatus: true
-                                )
-                                if (result != 0) {
-                                    error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
-                                } else {
-                                    echo "✅ No PHP vulnerabilities"
+                        stage('Composer Audit') {
+                            agent {
+                                docker { 
+                                    image 'php:8.2-cli'
+                                    args '-u root'
                                 }
                             }
-                        }
-                    }
-                }
-                
-                stage('NPM Audit') {
+                            steps {
+                                dir('workspace/bagisto') {
+                                    sh '''
+                                        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                                        composer audit --no-dev
+                                    '''
+                                }
+                            }
+                        }                stage('NPM Audit') {
                     agent {
                         docker { 
                             image 'node:18-alpine'
