@@ -7,6 +7,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "bao110304/bagisto"
+        CI_IMAGE = "bao110304/bagisto-ci:latest"
         BUILD_TAG = "${BUILD_NUMBER}-${GIT_COMMIT}"
     }
 
@@ -31,18 +32,13 @@ pipeline {
                 stage('Backend Build') {
                     agent {
                         docker {
-                            image 'php:8.3-cli'
+                            image "${CI_IMAGE}"
                             args '-u root'
                         }
                     }
                     steps {
                         dir('workspace/bagisto') {
-                            sh '''
-                                apt-get update --allow-releaseinfo-change || true
-                                apt-get install -y git unzip || (echo "Install failed, trying without update" && apt-get install -y --no-install-recommends git unzip)
-                                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-                                composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-calendar --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql --ignore-platform-req=ext-gd --ignore-platform-req=ext-zip
-                            '''
+                            sh 'composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-calendar --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql --ignore-platform-req=ext-gd --ignore-platform-req=ext-zip'
                         }
                         stash name: 'vendor', includes: 'workspace/bagisto/vendor/**'
                     }
@@ -72,7 +68,7 @@ pipeline {
                 stage('PHPUnit Tests') {
                     agent {
                         docker {
-                            image 'php:8.3'
+                            image "${CI_IMAGE}"
                             args '-u root'
                         }
                     }
@@ -137,7 +133,7 @@ pipeline {
                 stage('Composer Audit') {
                     agent {
                         docker { 
-                            image 'php:8.3-cli'
+                            image "${CI_IMAGE}"
                             args '-u root'
                         }
                     }
@@ -145,12 +141,7 @@ pipeline {
                         dir('workspace/bagisto') {
                             script {
                                 def auditOutput = sh(
-                                    script: '''
-                                        apt-get update --allow-releaseinfo-change || true
-                                        apt-get install -y git unzip || (echo "Install failed, trying without update" && apt-get install -y --no-install-recommends git unzip)
-                                        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-                                        composer audit --no-dev
-                                    ''',
+                                    script: 'composer audit --no-dev',
                                     returnStdout: true
                                 ).trim()
                                 
