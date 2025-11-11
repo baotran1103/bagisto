@@ -38,6 +38,7 @@ pipeline {
                     steps {
                         dir('workspace/bagisto') {
                             sh '''
+                                apt-get update && apt-get install -y git unzip
                                 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
                                 composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-calendar --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql --ignore-platform-req=ext-gd --ignore-platform-req=ext-zip
                             '''
@@ -142,6 +143,7 @@ pipeline {
                                     script {
                                         def auditOutput = sh(
                                             script: '''
+                                                apt-get update && apt-get install -y git unzip
                                                 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
                                                 composer audit --no-dev --min-level=high
                                             ''',
