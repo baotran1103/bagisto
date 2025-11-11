@@ -56,8 +56,8 @@ WORKDIR /var/www/html
 COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Copy application from builder
-COPY --from=builder /build /var/www/html
+# Copy application from builder (copy contents, not directory)
+COPY --from=builder /build/. /var/www/html/
 
 # Create nginx user and set permissions
 RUN adduser -D -H -u 101 -s /sbin/nologin -G nginx nginx 2>/dev/null || true && \
