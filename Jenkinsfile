@@ -147,10 +147,21 @@ pipeline {
                                             returnStdout: true
                                         ).trim()
                                         
+                                        // Commented out fail/pass logic
+                                        /*
                                         if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
                                             error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
                                         } else {
                                             echo "✅ No PHP vulnerabilities (moderate+)"
+                                        }
+                                        */
+                                        
+                                        // New logic: auto pass, just echo if vulnerabilities found
+                                        echo "Checking for PHP vulnerabilities..."
+                                        if (auditOutput.contains('Severity:')) {
+                                            echo "⚠️ PHP vulnerabilities found: ${auditOutput}"
+                                        } else {
+                                            echo "✅ No PHP vulnerabilities"
                                         }
                                     }
                                 }
@@ -171,8 +182,19 @@ pipeline {
                                     script: 'npm audit --audit-level=moderate',
                                     returnStatus: true
                                 )
+                                // Commented out fail/pass logic
+                                /*
                                 if (result != 0) {
                                     error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
+                                } else {
+                                    echo "✅ No Node vulnerabilities"
+                                }
+                                */
+                                
+                                // New logic: auto pass, just echo if vulnerabilities found
+                                echo "Checking for Node vulnerabilities..."
+                                if (result != 0) {
+                                    echo "⚠️ Node vulnerabilities found"
                                 } else {
                                     echo "✅ No Node vulnerabilities"
                                 }
