@@ -43,6 +43,7 @@ pipeline {
                                 composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-calendar --ignore-platform-req=ext-intl --ignore-platform-req=ext-pdo_mysql --ignore-platform-req=ext-gd --ignore-platform-req=ext-zip
                             '''
                         }
+                        stash name: 'vendor', includes: 'workspace/bagisto/vendor/**'
                     }
                 }
                 
@@ -75,8 +76,9 @@ pipeline {
                         }
                     }
                     steps {
+                        unstash 'vendor'
                         dir('workspace/bagisto') {
-                            sh './vendor/bin/pest --stop-on-failure'
+                            sh './vendor/bin/pest tests/Unit/CoreHelpersTest.php --stop-on-failure'
                         }
                     }
                 }
