@@ -8,7 +8,8 @@ pipeline {
     environment {
         DOCKER_IMAGE = "bao110304/bagisto"
         CI_IMAGE = "bao110304/bagisto-ci:latest"
-        BUILD_TAG = "${BUILD_NUMBER}-${GIT_COMMIT}"
+        GIT_SHORT_COMMIT = "${GIT_COMMIT?.take(7) ?: 'unknown'}"
+        BUILD_TAG = "${BUILD_NUMBER}-${GIT_SHORT_COMMIT}"
     }
 
     stages {
@@ -19,11 +20,6 @@ pipeline {
                 git branch: 'main',
                     credentialsId: 'GITHUB_PAT',
                     url: 'https://github.com/baotran1103/bagisto.git'
-                
-                script {
-                    env.GIT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.BUILD_TAG = "${BUILD_NUMBER}-${env.GIT_COMMIT}"
-                }
             }
         }
         
