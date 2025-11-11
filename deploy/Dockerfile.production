@@ -15,9 +15,11 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-# Install only missing PHP extensions (mbstring, dom, xml already in base image)
+# Install missing PHP extensions required by composer.json + commonly used
+# Already in base: mbstring, curl, openssl, PDO, tokenizer
+# Need to install: pdo_mysql, calendar, intl, gd (images), zip (exports), exif (images), pcntl (queue), bcmath (currency)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install -j$(nproc) pdo_mysql exif pcntl bcmath gd zip calendar intl
+    docker-php-ext-install -j$(nproc) pdo_mysql calendar intl gd zip exif pcntl bcmath
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -27,9 +29,9 @@ WORKDIR /build
 # Copy source code first (needed for composer post-install scripts)
 COPY workspace/bagisto/ .
 
-# Install dependencies
+# Install dependencies (keep devDependencies for build)
 RUN composer install --no-dev --optimize-autoloader --no-interaction && \
-    npm ci --omit=dev --prefer-offline
+    npm ci --prefer-offline
 
 # Build frontend assets
 RUN npm run build && rm -rf node_modules
