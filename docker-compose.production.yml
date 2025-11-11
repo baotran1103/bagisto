@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  bagisto:
+    image: bao110304/bagisto:latest
+    container_name: bagisto-app
+    ports:
+      - "80:80"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=http://139.180.218.27
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=bagisto
+      - DB_USERNAME=bagisto_user
+      - DB_PASSWORD=bagisto_secure_password_2024
+    volumes:
+      - bagisto-storage:/var/www/html/storage
+      - bagisto-public:/var/www/html/public/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - bagisto-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: bagisto-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password_2024
+      - MYSQL_DATABASE=bagisto
+      - MYSQL_USER=bagisto_user
+      - MYSQL_PASSWORD=bagisto_secure_password_2024
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - bagisto-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: bagisto-redis
+    networks:
+      - bagisto-network
+    restart: unless-stopped
+
+volumes:
+  bagisto-storage:
+  bagisto-public:
+  mysql-data:
+
+networks:
+  bagisto-network:
+    driver: bridge
