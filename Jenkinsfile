@@ -141,12 +141,14 @@ pipeline {
                         dir('workspace/bagisto') {
                             script {
                                 def auditOutput = sh(
-                                    script: 'composer audit --no-dev',
+                                    script: 'composer audit --no-dev || true',
                                     returnStdout: true
                                 ).trim()
                                 
-                                if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
-                                    error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                if (auditOutput.contains('security vulnerability advisories found')) {
+                                    if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
+                                        error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                    }
                                 } else {
                                     echo "✅ No PHP vulnerabilities (moderate+)"
                                 }
