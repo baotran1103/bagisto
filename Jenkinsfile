@@ -31,7 +31,7 @@ pipeline {
                 stage('Backend Build') {
                     agent {
                         docker {
-                            image 'php:8.2-cli'
+                            image 'php:8.3-cli'
                             args '-u root'
                         }
                     }
@@ -69,7 +69,7 @@ pipeline {
                 stage('PHPUnit Tests') {
                     agent {
                         docker {
-                            image 'php:8.2'
+                            image 'php:8.3'
                             args '-u root'
                         }
                     }
@@ -133,7 +133,7 @@ pipeline {
                         stage('Composer Audit') {
                             agent {
                                 docker { 
-                                    image 'php:8.2-cli'
+                                    image 'php:8.3-cli'
                                     args '-u root'
                                 }
                             }
