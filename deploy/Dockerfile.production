@@ -17,7 +17,8 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     oniguruma-dev \
-    icu-dev
+    icu-dev \
+    zlib-dev
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
@@ -47,7 +48,18 @@ RUN npm run build && rm -rf node_modules
 # ==========================================
 FROM php:8.2-fpm-alpine
 
-# Install runtime dependencies only
+# Install build dependencies (needed for compiling extensions)
+RUN apk add --no-cache --virtual .build-deps \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libxml2-dev \
+    libzip-dev \
+    oniguruma-dev \
+    icu-dev \
+    zlib-dev
+
+# Install runtime dependencies
 RUN apk add --no-cache \
     nginx \
     mysql-client \
@@ -61,7 +73,8 @@ RUN apk add --no-cache \
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip calendar intl
+    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip calendar intl && \
+    apk del .build-deps
 
 WORKDIR /var/www/html
 
