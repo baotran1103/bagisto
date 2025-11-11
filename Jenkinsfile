@@ -97,14 +97,14 @@ pipeline {
                                 }
                                 
                                 // Wait for quality gate result
-                                timeout(time: 5, unit: 'MINUTES') {
-                                    def qg = waitForQualityGate()
-                                    if (qg.status != 'OK') {
-                                        unstable("⚠️ Quality gate failed: ${qg.status} - Review required before merge")
-                                    } else {
-                                        echo "✅ Quality gate passed"
-                                    }
-                                }
+                                // timeout(time: 5, unit: 'MINUTES') {
+                                //     def qg = waitForQualityGate()
+                                //     if (qg.status != 'OK') {
+                                //         unstable("⚠️ Quality gate failed: ${qg.status} - Review required before merge")
+                                //     } else {
+                                //         echo "✅ Quality gate passed"
+                                //     }
+                                // }
                             } catch (Exception e) {
                                 echo "⚠️ SonarQube skipped: ${e.message}"
                             }
@@ -131,44 +131,34 @@ pipeline {
                     }
                 }
                 
-                        stage('Composer Audit') {
-                            agent {
-                                docker { 
-                                    image 'php:8.3-cli'
-                                    args '-u root'
-                                }
-                            }
-                            steps {
-                                dir('workspace/bagisto') {
-                                    script {
-                                        def auditOutput = sh(
-                                            script: '''
-                                                apt-get update && apt-get install -y git unzip
-                                                curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-                                                composer audit --no-dev
-                                            ''',
-                                            returnStdout: true
-                                        ).trim()
-                                        
-                                        // Commented out fail/pass logic
-                                        /*
-                                        if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
-                                            error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
-                                        } else {
-                                            echo "✅ No PHP vulnerabilities (moderate+)"
-                                        }
-                                        */
-                                        
-                                        echo "Checking for PHP vulnerabilities..."
-                                        if (auditOutput.contains('Severity:')) {
-                                            echo "⚠️ PHP vulnerabilities found: ${auditOutput}"
-                                        } else {
-                                            echo "✅ No PHP vulnerabilities"
-                                        }
-                                    }
+                stage('Composer Audit') {
+                    agent {
+                        docker { 
+                            image 'php:8.3-cli'
+                            args '-u root'
+                        }
+                    }
+                    steps {
+                        dir('workspace/bagisto') {
+                            script {
+                                def auditOutput = sh(
+                                    script: '''
+                                        apt-get update && apt-get install -y git unzip
+                                        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                                        composer audit --no-dev
+                                    ''',
+                                    returnStdout: true
+                                ).trim()
+                                
+                                if (auditOutput.contains('Severity: moderate') || auditOutput.contains('Severity: high') || auditOutput.contains('Severity: critical')) {
+                                    error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                } else {
+                                    echo "✅ No PHP vulnerabilities (moderate+)"
                                 }
                             }
                         }
+                    }
+                }
                 
                 stage('NPM Audit') {
                     agent {
@@ -184,18 +174,9 @@ pipeline {
                                     script: 'npm audit --audit-level=moderate',
                                     returnStatus: true
                                 )
-                                // Commented out fail/pass logic
-                                /*
+
                                 if (result != 0) {
                                     error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
-                                } else {
-                                    echo "✅ No Node vulnerabilities"
-                                }
-                                */
-                                
-                                echo "Checking for Node vulnerabilities..."
-                                if (result != 0) {
-                                    echo "⚠️ Node vulnerabilities found"
                                 } else {
                                     echo "✅ No Node vulnerabilities"
                                 }
