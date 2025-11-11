@@ -3,42 +3,33 @@
 # ==========================================
 FROM php:8.3-fpm-alpine AS builder
 
-# Install build dependencies
+# Install only missing build dependencies
 RUN apk add --no-cache \
     git \
-    curl \
+    unzip \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev \
-    libxml2-dev \
     libzip-dev \
-    zip \
-    unzip \
-    nodejs \
-    npm \
-    oniguruma-dev \
     icu-dev \
-    zlib-dev
+    nodejs \
+    npm
 
-# Install PHP extensions
+# Install only missing PHP extensions (mbstring, dom, xml already in base image)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip calendar intl
+    docker-php-ext-install -j$(nproc) pdo_mysql exif pcntl bcmath gd zip calendar intl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /build
 
-# Copy dependency files from workspace/bagisto
-COPY workspace/bagisto/composer.json workspace/bagisto/composer.lock ./
-COPY workspace/bagisto/package.json workspace/bagisto/package-lock.json ./
+# Copy source code first (needed for composer post-install scripts)
+COPY workspace/bagisto/ .
 
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction && \
-    npm ci --prefer-offline
-
-# Copy source code
-COPY workspace/bagisto/ .
+    npm ci --omit=dev --prefer-offline
 
 # Build frontend assets
 RUN npm run build && rm -rf node_modules
@@ -48,18 +39,14 @@ RUN npm run build && rm -rf node_modules
 # ==========================================
 FROM php:8.3-fpm-alpine
 
-# Install runtime dependencies ONLY (no -dev packages)
+# Install only missing runtime libraries (libxml2, oniguruma already in base)
 RUN apk add --no-cache \
     nginx \
-    mysql-client \
     libpng \
     libjpeg-turbo \
     freetype \
-    libxml2 \
     libzip \
-    oniguruma \
-    icu \
-    libgomp
+    icu-libs
 
 WORKDIR /var/www/html
 
