@@ -126,29 +126,31 @@ pipeline {
                     }
                 }
                 
-                        stage('Composer Audit') {
-                            agent {
-                                docker { 
-                                    image 'composer:latest'
-                                    args '-u root'
+                stage('Composer Audit') {
+                    agent {
+                        docker { 
+                            image 'composer:latest'
+                            args '-u root'
+                        }
+                    }
+                    steps {
+                        dir('workspace/bagisto') {
+                            script {
+                                def result = sh(
+                                    script: 'composer audit --no-dev',
+                                    returnStatus: true
+                                )
+                                if (result != 0) {
+                                    error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                } else {
+                                    echo "✅ No PHP vulnerabilities"
                                 }
                             }
-                            steps {
-                                dir('workspace/bagisto') {
-                                    script {
-                                        def result = sh(
-                                            script: 'composer audit --no-dev',
-                                            returnStatus: true
-                                        )
-                                        if (result != 0) {
-                                            error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
-                                        } else {
-                                            echo "✅ No PHP vulnerabilities"
-                                        }
-                                    }
-                                }
-                            }
-                        }                stage('NPM Audit') {
+                        }
+                    }
+                }                }
+                
+                stage('NPM Audit') {
                     agent {
                         docker { 
                             image 'node:18-alpine'
