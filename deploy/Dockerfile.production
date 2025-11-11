@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Build Dependencies
 # ==========================================
-FROM php:8.2-fpm-alpine AS builder
+FROM php:8.3-fpm-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -46,7 +46,7 @@ RUN npm run build && rm -rf node_modules
 # ==========================================
 # Stage 2: Production Image
 # ==========================================
-FROM php:8.2-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 # Install runtime dependencies ONLY (no -dev packages)
 RUN apk add --no-cache \
