@@ -84,6 +84,16 @@ pipeline {
                                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
                                     """
                                 }
+                                
+                                // Wait for quality gate result
+                                timeout(time: 5, unit: 'MINUTES') {
+                                    def qg = waitForQualityGate()
+                                    if (qg.status != 'OK') {
+                                        unstable("⚠️ Quality gate failed: ${qg.status} - Review required before merge")
+                                    } else {
+                                        echo "✅ Quality gate passed"
+                                    }
+                                }
                             } catch (Exception e) {
                                 echo "⚠️ SonarQube skipped: ${e.message}"
                             }
@@ -93,10 +103,22 @@ pipeline {
                 
                 stage('Security Scans') {
                     parallel {
-                        stage('ClamAV') {
+                        stage('ClamAV Malware Scan') {
                             agent any
                             steps {
-                                sh 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules . || echo "⚠️ ClamAV warnings"'
+                                script {
+                                    def result = sh(
+                                        script: 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules .',
+                                        returnStatus: true
+                                    )
+                                    if (result == 1) {
+                                        error "❌ CRITICAL: Malware/virus detected! Build aborted."
+                                    } else if (result != 0) {
+                                        echo "⚠️ ClamAV completed with warnings"
+                                    } else {
+                                        echo "✅ No malware detected"
+                                    }
+                                }
                             }
                         }
                         
@@ -108,7 +130,17 @@ pipeline {
                                 }
                             }
                             steps {
-                                sh 'composer audit || echo "⚠️ PHP vulnerabilities found"'
+                                script {
+                                    def result = sh(
+                                        script: 'composer audit --no-dev',
+                                        returnStatus: true
+                                    )
+                                    if (result != 0) {
+                                        error "❌ FAILED: PHP dependency vulnerabilities found (MODERATE+). Fix required!"
+                                    } else {
+                                        echo "✅ No PHP vulnerabilities"
+                                    }
+                                }
                             }
                         }
                         
@@ -120,7 +152,17 @@ pipeline {
                                 }
                             }
                             steps {
-                                sh 'npm audit --audit-level=moderate || echo "⚠️ Node vulnerabilities found"'
+                                script {
+                                    def result = sh(
+                                        script: 'npm audit --audit-level=moderate',
+                                        returnStatus: true
+                                    )
+                                    if (result != 0) {
+                                        error "❌ FAILED: Node dependency vulnerabilities found (MODERATE+). Fix required!"
+                                    } else {
+                                        echo "✅ No Node vulnerabilities"
+                                    }
+                                }
                             }
                         }
                     }
@@ -150,13 +192,12 @@ pipeline {
         
         stage('Image Security Scan') {
             agent any
+            when {
+                expression { return false }  // Skip for now
+            }
             steps {
                 script {
-                    try {
-                        sh "docker scan ${DOCKER_IMAGE}:${BUILD_TAG} || echo '⚠️ Security scan completed with warnings'"
-                    } catch (Exception e) {
-                        echo "⚠️ Image scan skipped: ${e.message}"
-                    }
+                    echo "⚠️ Image security scan is currently disabled"
                 }
             }
         }
