@@ -43,6 +43,11 @@ ssh ${VPS_USER}@${VPS_HOST} << EOF
   echo "⏳ Waiting for services to be ready..."
   sleep 10
   
+  # Fix permissions (ensure www-data owns storage and cache)
+  echo "🔐 Fixing permissions..."
+  docker-compose -f docker-compose.production.yml exec -T bagisto chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache || true
+  docker-compose -f docker-compose.production.yml exec -T bagisto chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
+  
   # Run migrations (only on first deploy or when needed)
   echo "🔧 Running migrations..."
   docker-compose -f docker-compose.production.yml exec -T bagisto php artisan migrate --force || echo "⚠️  Migrations skipped or failed"

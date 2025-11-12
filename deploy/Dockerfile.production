@@ -59,10 +59,12 @@ COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 # Copy application from builder (copy contents, not directory)
 COPY --from=builder /build/. /var/www/html/
 
-# Create nginx user and set permissions
-RUN adduser -D -H -u 101 -s /sbin/nologin -G nginx nginx 2>/dev/null || true && \
-    chown -R nginx:nginx /var/www/html && \
-    chmod -R 755 storage bootstrap/cache
+# Create users and set permissions
+# PHP-FPM runs as www-data (uid 82), nginx as nginx (uid 101)
+RUN adduser -D -H -u 82 -s /sbin/nologin www-data 2>/dev/null || true && \
+    adduser -D -H -u 101 -s /sbin/nologin -G www-data nginx 2>/dev/null || true && \
+    chown -R www-data:www-data /var/www/html && \
+    chmod -R 775 storage bootstrap/cache
 
 # Copy nginx configuration
 RUN mkdir -p /var/cache/nginx/client_temp /var/log/nginx /var/run && \
