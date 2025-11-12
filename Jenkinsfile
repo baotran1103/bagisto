@@ -238,6 +238,41 @@ pipeline {
                 }
             }
         }
+        
+        stage('Deploy to VPS') {
+            agent any
+            steps {
+                script {
+                    echo "🚀 Deploying to production VPS..."
+                    
+                    withCredentials([sshUserPrivateKey(
+                        credentialsId: 'vps-ssh-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )]) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i \${SSH_KEY} \${SSH_USER}@139.180.218.27 << 'ENDSSH'
+                                set -e
+                                echo "📥 Pulling latest Docker image..."
+                                cd /root/bagisto
+                                docker-compose -f docker-compose.production.yml pull bagisto
+                                
+                                echo "🔄 Recreating containers..."
+                                docker-compose -f docker-compose.production.yml up -d --force-recreate bagisto
+                                
+                                echo "🧹 Cleaning up old images..."
+                                docker image prune -f
+                                
+                                echo "✅ Deployment completed successfully!"
+                                docker-compose -f docker-compose.production.yml ps
+ENDSSH
+                        """
+                    }
+                    
+                    echo "✅ Deployed to VPS: 139.180.218.27"
+                }
+            }
+        }
     }
     
     post {
