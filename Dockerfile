@@ -55,7 +55,9 @@ COPY --from=dependencies /var/www/html/node_modules /var/www/html/node_modules
 
 # Copy code
 COPY workspace/bagisto/ .
-RUN composer install --no-dev --optimize-autoloader --no-interaction # Chạy lại để dump-autoload
+
+# Install ALL dependencies including dev (for testing)
+RUN composer install --optimize-autoloader --no-interaction
 RUN npm run build && rm -rf node_modules
 RUN rm -f public/storage
 
