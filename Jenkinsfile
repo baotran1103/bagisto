@@ -195,9 +195,10 @@ pipeline {
                     
                     sh """
                         docker build \
+                            --target production \
                             -t ${imageName} \
                             -t ${imageLatest} \
-                            -f deploy/Dockerfile.production \
+                            -f Dockerfile.unified \
                             .
                     """
                     

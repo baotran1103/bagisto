@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  bagisto:
+    image: ${DOCKER_IMAGE:-bao110304/bagisto:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.unified
+      target: ${BUILD_TARGET:-development}
+    container_name: bagisto-app
+    ports:
+      - "${APP_PORT:-80}:80"
+      - "${VITE_PORT:-5173}:5173"
+    environment:
+      - APP_NAME=${APP_NAME:-Bagisto}
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_URL=${APP_URL:-http://localhost}
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-bagisto}
+      - DB_USERNAME=${DB_USERNAME:-bagisto_user}
+      - DB_PASSWORD=${DB_PASSWORD:-bagisto_password}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    volumes:
+      # Conditional mount: only in development
+      - ${SOURCE_MOUNT:-./empty}:/var/www/html:${MOUNT_MODE:-rw}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - bagisto-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: bagisto-mysql
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=${DB_DATABASE:-bagisto}
+      - MYSQL_USER=${DB_USERNAME:-bagisto_user}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-bagisto_password}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - bagisto-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: bagisto-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - bagisto-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+
+networks:
+  bagisto-network:
+    driver: bridge
