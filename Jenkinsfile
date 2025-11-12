@@ -65,11 +65,10 @@ pipeline {
                         script {
                             echo "📊 Running SonarQube scan in Docker..."
                             try {
-                                // Get SonarQube token from Jenkins credentials
                                 withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                                     sh """
                                         docker run --rm \\
-                                            -e SONAR_HOST_URL=http://your-sonarqube-server:9000 \\
+                                            -e SONAR_HOST_URL=http://host.docker.internal:9000 \\
                                             -e SONAR_TOKEN=\${SONAR_TOKEN} \\
                                             -v \$(pwd):/usr/src \\
                                             sonarsource/sonar-scanner-cli \\
@@ -80,8 +79,8 @@ pipeline {
                                 }
                                 echo "✅ SonarQube scan completed"
                             } catch (Exception e) {
-                                echo "⚠️ SonarQube skipped: ${e.message}"
-                                echo "💡 To enable: Add 'sonarqube-token' credential in Jenkins"
+                                echo "⚠️ SonarQube failed: ${e.message}"
+                                echo "Check if SonarQube server is running at http://host.docker.internal:9000"
                             }
                         }
                     }
@@ -147,7 +146,6 @@ pipeline {
                     def imageName = "${DOCKER_IMAGE}:${env.BUILD_TAG}"
                     def imageLatest = "${DOCKER_IMAGE}:latest"
                     
-                    echo "📦 Building PRODUCTION image (clean, no build tools)..."
                     echo "💡 Using build-${env.BUILD_TAG} as cache (fast build!)"
                     sh """
                         docker build \
@@ -160,7 +158,6 @@ pipeline {
                     """
                     
                     echo "✅ Production image built: ${imageName}"
-                    echo "⚡ Build was super fast thanks to cache reuse!"
                 }
             }
         }
