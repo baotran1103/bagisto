@@ -15,9 +15,6 @@ services:
       - DB_DATABASE=bagisto
       - DB_USERNAME=bagisto_user
       - DB_PASSWORD=bagisto_secure_password_2024
-    volumes:
-      - bagisto-storage:/var/www/html/storage
-      - bagisto-public:/var/www/html/public/storage
     depends_on:
       mysql:
         condition: service_healthy
@@ -52,8 +49,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  bagisto-storage:
-  bagisto-public:
   mysql-data:
 
 networks:
