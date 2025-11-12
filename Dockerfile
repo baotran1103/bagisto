@@ -1,27 +1,28 @@
-# ==========================================
-# Base Stage: Common dependencies for all environments
-# ==========================================
-FROM php:8.3-fpm-alpine AS base
-
-# Install runtime and build dependencies
+# 1. Runtime Stage
+FROM php:8.3-fpm-alpine AS runtime_base
 RUN apk add --no-cache \
-    # Runtime libraries
     nginx \
     libpng \
     libjpeg-turbo \
     freetype \
     libzip \
-    icu-libs \
-    # Build dependencies (needed for extensions)
+    icu-libs
+
+# 2. Build Stage: Chứa mọi thứ để BUILD
+FROM runtime_base AS build_base
+# Cài các gói -dev, build tools
+RUN apk add --no-cache \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev \
     libzip-dev \
     icu-dev \
     git \
-    unzip
+    unzip \
+    nodejs \
+    npm
 
-# Install PHP extensions (same across all environments)
+# Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) \
         pdo_mysql \
@@ -33,87 +34,46 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
         pcntl \
         bcmath
 
-# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Install Node.js and npm
-RUN apk add --no-cache nodejs npm
 
 WORKDIR /var/www/html
 
-# ==========================================
-# Dependencies Stage: Install dependencies (cached separately)
-# ==========================================
-FROM base AS dependencies
+# 3. Dependencies Stage
+FROM build_base AS dependencies
 
-# Copy dependency files first (for layer caching)
+WORKDIR /var/www/html
 COPY workspace/bagisto/composer.json workspace/bagisto/composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader --no-interaction
-
 COPY workspace/bagisto/package.json workspace/bagisto/package-lock.json ./
 RUN npm ci --prefer-offline
 
-# ==========================================
-# Development Stage: For local development with hot reload
-# ==========================================
-FROM base AS development
+# 4. Builder Stage
+FROM build_base AS builder
 
-# Install development tools
-RUN apk add --no-cache $PHPIZE_DEPS && \
-    pecl install xdebug && \
-    docker-php-ext-enable xdebug
+COPY --from=dependencies /var/www/html/vendor /var/www/html/vendor
+COPY --from=dependencies /var/www/html/node_modules /var/www/html/node_modules
 
-# Configure Xdebug
-RUN echo "xdebug.mode=debug" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
-    echo "xdebug.client_host=host.docker.internal" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
-    echo "xdebug.client_port=9003" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
-    echo "xdebug.start_with_request=yes" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
-
-# Copy nginx config for development
-COPY .configs/nginx/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Development runs with mounted volumes, no need to copy code
-WORKDIR /var/www/html
-
-EXPOSE 9000 80
-
-CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
-
-# ==========================================
-# Builder Stage: Build assets
-# ==========================================
-FROM dependencies AS builder
-
-# Copy all source code
+# Copy code
 COPY workspace/bagisto/ .
-
-# Install dependencies with scripts
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Build frontend assets
+RUN composer install --no-dev --optimize-autoloader --no-interaction # Chạy lại để dump-autoload
 RUN npm run build && rm -rf node_modules
-
-# Remove wrong symlink created by Bagisto installer
 RUN rm -f public/storage
 
-# ==========================================
-# Production Stage: Optimized for production
-# ==========================================
-FROM base AS production
+# 5. Production Stage
+FROM runtime_base AS production
+WORKDIR /var/www/html
 
-# Copy PHP extensions and configs from base
-COPY --from=base /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
-COPY --from=base /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+#  Chỉ copy các extension đã được biên dịch từ 'build_base'
+COPY --from=build_base /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=build_base /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Copy built application from builder
+# Copy code đã build từ 'builder'
 COPY --from=builder /var/www/html /var/www/html
 
-# Create correct storage symlink with relative path
 RUN ln -s ../storage/app/public public/storage && \
     chown -R www-data:www-data /var/www/html && \
     chmod -R 775 storage bootstrap/cache
 
-# Copy nginx configuration
 RUN mkdir -p /var/cache/nginx/client_temp /var/log/nginx /var/run && \
     rm -f /etc/nginx/conf.d/default.conf
 
