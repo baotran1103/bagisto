@@ -195,6 +195,9 @@ pipeline {
         
         stage('Push to Docker Hub') {
             agent any
+            options {
+                skipDefaultCheckout()
+            }
             steps {
                 script {
                     withCredentials([usernamePassword(
@@ -216,6 +219,9 @@ pipeline {
         
         stage('Deploy to VPS') {
             agent any
+            options {
+                skipDefaultCheckout()
+            }
             steps {
                 script {
                     def deployTag = env.BUILD_TAG
