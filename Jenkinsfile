@@ -263,7 +263,10 @@ pipeline {
             agent any
             steps {
                 script {
-                    echo "🚀 Deploying to production VPS..."
+                    def deployTag = env.BUILD_TAG
+                    def deployImage = "${DOCKER_IMAGE}:${deployTag}"
+                    
+                    echo "🚀 Deploying version ${deployTag} to production VPS..."
                     
                     withCredentials([sshUserPrivateKey(
                         credentialsId: 'vps-ssh-key',
@@ -273,23 +276,40 @@ pipeline {
                         sh """
                             ssh -o StrictHostKeyChecking=no -i \${SSH_KEY} \${SSH_USER}@139.180.218.27 << 'ENDSSH'
                                 set -e
-                                echo "📥 Pulling latest Docker image..."
                                 cd /root/bagisto
-                                docker-compose -f docker-compose.production.yml pull bagisto
                                 
-                                echo "🔄 Recreating containers..."
+                                echo "📥 Pulling specific version: ${deployImage}"
+                                docker pull ${deployImage}
+                                
+                                echo "📝 Updating docker-compose to use version ${deployTag}..."
+                                sed -i 's|image: bao110304/bagisto:.*|image: ${deployImage}|' docker-compose.production.yml
+                                
+                                echo "🔄 Deploying version ${deployTag}..."
                                 docker-compose -f docker-compose.production.yml up -d --force-recreate bagisto
                                 
-                                echo "🧹 Cleaning up old images..."
-                                docker image prune -f
+                                echo "📋 Recording deployment..."
+                                echo "\$(date '+%Y-%m-%d %H:%M:%S') - Deployed: ${deployTag}" >> /var/log/bagisto-deployments.log
+                                
+                                echo "🧹 Cleaning up old images (keeping last 5)..."
+                                docker images bao110304/bagisto --format "{{.Tag}}" | grep -v latest | tail -n +6 | xargs -r -I {} docker rmi bao110304/bagisto:{} || true
                                 
                                 echo "✅ Deployment completed successfully!"
+                                echo "📊 Current deployment:"
                                 docker-compose -f docker-compose.production.yml ps
+                                echo ""
+                                echo "📜 Recent deployments:"
+                                tail -5 /var/log/bagisto-deployments.log
 ENDSSH
                         """
                     }
                     
-                    echo "✅ Deployed to VPS: 139.180.218.27"
+                    echo """
+                    ═══════════════════════════════════════
+                    ✅ Deployed to VPS: 139.180.218.27
+                    📦 Version: ${deployTag}
+                    🔙 Rollback: ssh root@139.180.218.27 'cd /root/bagisto && sed -i \"s|image: .*|image: bao110304/bagisto:PREVIOUS_TAG|\" docker-compose.production.yml && docker-compose up -d'
+                    ═══════════════════════════════════════
+                    """
                 }
             }
         }
