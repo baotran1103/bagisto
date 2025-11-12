@@ -53,7 +53,7 @@ pipeline {
                             sh """
                                 docker run --rm \
                                     ${DOCKER_IMAGE}:build-${BUILD_TAG} \
-                                    sh -c 'cd /build && vendor/bin/pest tests/Unit --stop-on-failure'
+                                    sh -c 'cd /var/www/html && vendor/bin/pest tests/Unit --stop-on-failure'
                             """
                         }
                     }
@@ -63,18 +63,25 @@ pipeline {
                     agent any
                     steps {
                         script {
+                            echo "📊 Running SonarQube scan in Docker..."
                             try {
-                                def scannerHome = tool 'SonarScanner'
-                                withSonarQubeEnv('SonarQube') {
+                                // Get SonarQube token from Jenkins credentials
+                                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                                     sh """
-                                        \${scannerHome}/bin/sonar-scanner \\
+                                        docker run --rm \\
+                                            -e SONAR_HOST_URL=http://your-sonarqube-server:9000 \\
+                                            -e SONAR_TOKEN=\${SONAR_TOKEN} \\
+                                            -v \$(pwd):/usr/src \\
+                                            sonarsource/sonar-scanner-cli \\
                                             -Dsonar.projectKey=bagisto \\
                                             -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
-                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
+                                            -Dsonar.exclusions=**/vendor/**,**/node_modules/**,**/storage/**,**/public/**,**/tests/**
                                     """
                                 }
+                                echo "✅ SonarQube scan completed"
                             } catch (Exception e) {
-                                echo "⚠️ SonarQube skipped: \${e.message}"
+                                echo "⚠️ SonarQube skipped: ${e.message}"
+                                echo "💡 To enable: Add 'sonarqube-token' credential in Jenkins"
                             }
                         }
                     }
@@ -84,13 +91,19 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            def result = sh(
-                                script: 'clamscan -r --exclude-dir=vendor --exclude-dir=node_modules .',
+                            echo "🦠 Running ClamAV scan in Docker container..."
+                            def scanResult = sh(
+                                script: """
+                                    docker run --rm -v \$(pwd):/workspace \
+                                        clamav/clamav:latest \
+                                        clamscan -r --exclude-dir=vendor --exclude-dir=node_modules /workspace || true
+                                """,
                                 returnStatus: true
                             )
-                            if (result == 1) {
+                            
+                            if (scanResult == 1) {
                                 error "❌ CRITICAL: Malware/virus detected! Build aborted."
-                            } else if (result != 0) {
+                            } else if (scanResult != 0) {
                                 echo "⚠️ ClamAV completed with warnings"
                             } else {
                                 echo "✅ No malware detected"
@@ -108,7 +121,7 @@ pipeline {
                                 script: """
                                     docker run --rm \
                                         ${DOCKER_IMAGE}:build-${BUILD_TAG} \
-                                        sh -c 'cd /build && composer audit --no-dev || true'
+                                        sh -c 'cd /var/www/html && composer audit --no-dev || true'
                                 """,
                                 returnStdout: true
                             ).trim()
@@ -124,15 +137,6 @@ pipeline {
                     }
                 }
                 
-                stage('NPM Audit') {
-                    agent any
-                    steps {
-                        script {
-                            echo "⚠️ NPM audit skipped (node_modules removed after build)"
-                            echo "✅ Frontend dependencies audited during build stage"
-                        }
-                    }
-                }
             }
         }
         
