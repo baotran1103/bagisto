@@ -1,270 +1,73 @@
-services:
-  php-fpm:
-    build:
-      args:
-        uid: 1000
-        user: $USER
-        container_project_path: /var/www/html/
-      context: .
-      dockerfile: ./Dockerfile
-    image: php-fpm
-    ports:
-      - 5173:5173
-    volumes:
-      - ~/.ssh:/home/$USER/.ssh
-      - ./workspace/:/var/www/html/
+version: '3.8'
 
-  nginx:
-    image: nginx:latest
+services:
+  bagisto:
+    image: ${DOCKER_IMAGE:-bao110304/bagisto:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.unified
+      target: ${BUILD_TARGET:-development}
+    container_name: bagisto-app
     ports:
-      - 80:80
+      - "${APP_PORT:-80}:80"
+      - "${VITE_PORT:-5173}:5173"
+    environment:
+      - APP_NAME=${APP_NAME:-Bagisto}
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_URL=${APP_URL:-http://localhost}
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-bagisto}
+      - DB_USERNAME=${DB_USERNAME:-bagisto_user}
+      - DB_PASSWORD=${DB_PASSWORD:-bagisto_password}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
     volumes:
-      - ./workspace/:/var/www/html/
-      - ./.configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      # Conditional mount: only in development
+      - ${SOURCE_MOUNT:-./empty}:/var/www/html:${MOUNT_MODE:-rw}
     depends_on:
-      - php-fpm
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - bagisto-network
+    restart: unless-stopped
 
   mysql:
     image: mysql:8.0
+    container_name: bagisto-mysql
     ports:
-      - 3306:3306
-    command: --default-authentication-plugin=mysql_native_password
+      - "${MYSQL_PORT:-3306}:3306"
     environment:
-      MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+      - MYSQL_DATABASE=${DB_DATABASE:-bagisto}
+      - MYSQL_USER=${DB_USERNAME:-bagisto_user}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-bagisto_password}
     volumes:
-      - ./.configs/data/mysql-data:/var/lib/mysql/
-      - ./workspace/:/var/www/html/
-
-  # phpmyadmin:
-  #   image: phpmyadmin:latest
-  #   ports:
-  #     - 8080:80
-  #   environment:
-  #     PMA_HOST: ${PMA_HOST}
-  #     PMA_USER: ${PMA_USER}
-  #     PMA_PASSWORD: ${PMA_PASSWORD}
-  #     UPLOAD_LIMIT: ${PMA_UPLOAD_LIMIT}
-  #     MEMORY_LIMIT: ${PMA_MEMORY_LIMIT}
-  #     MAX_EXECUTION_TIME: ${PMA_MAX_EXECUTION_TIME}
-
-  # redis:
-  #   image: redis:6.2-alpine
-  #   ports:
-  #     - 6379:6379
-  #   command: redis-server --save 20 1 --loglevel warning
-  #   volumes:
-  #     - ./.configs/data/redis-data:/data
-
-  # elasticsearch:
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
-  #   ports:
-  #     - 9200:9200
-  #     - 9300:9300
-  #   environment:
-  #     - xpack.security.enabled=false
-  #     - discovery.type=single-node
-  #     - bootstrap.memory_lock=true
-  #     - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
-  #   ulimits:
-  #     memlock:
-  #       soft: -1
-  #       hard: -1
-  #     nofile:
-  #       soft: 65536
-  #       hard: 65536
-  #   volumes:
-  #     - ./.configs/data/elasticsearch-data:/var/lib/elasticsearch/data
-
-  # kibana:
-  #   image: docker.elastic.co/kibana/kibana:7.17.0
-  #   ports:
-  #     - 5601:5601
-  #   environment:
-  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #   depends_on:
-  #     - elasticsearch
-
-  # mailpit:
-  #   image: "axllent/mailpit:latest"
-  #   ports:
-  #     - 8025:8025
-  #     - 1025:1025
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    ports:
-      - "9100:9100"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-
-  mysql-exporter:
-    image: prom/mysqld-exporter:v0.14.0
-    ports:
-      - "9104:9104"
-    environment:
-      - DATA_SOURCE_NAME=${MYSQL_EXPORTER_DATA_SOURCE_NAME}
-    depends_on:
-      - mysql
-
-  nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:latest
-    ports:
-      - "9113:9113"
-    command:
-      - -nginx.scrape-uri=http://nginx:80/stub_status
-    depends_on:
-      - nginx
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./.configs/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./.configs/data/prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    depends_on:
-      - node-exporter
-      - mysql-exporter
-      - nginx-exporter
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./.configs/data/grafana-data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-    depends_on:
-      - prometheus
-  # loki:
-  #     image: grafana/loki:3.0.0                   
-  #     container_name: loki                          
-  #     volumes:
-  #       - ./.configs/loki-config-official.yaml:/mnt/config/loki-config.yaml 
-  #       - ./.configs/data/loki-data:/tmp
-  #     ports:
-  #       - "3100:3100"                              
-  #     command: -config.file=/mnt/config/loki-config.yaml 
-
-  # promtail:
-  #   image: grafana/promtail:3.0.0                  
-  #   container_name: promtail                    
-  #   volumes:
-  #     - ./.configs/promtail-config-official.yaml:/mnt/config/promtail-config.yaml 
-  #     - ./workspace:/var/log/app                           
-  #   depends_on:
-  #     - loki                                      
-  #   command: -config.file=/mnt/config/promtail-config.yaml
-
-  sonarqube-db:
-    image: postgres:15-alpine
-    container_name: sonarqube-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: ${SONAR_DB_USER}
-      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
-      POSTGRES_DB: ${SONAR_DB_NAME}
-    volumes:
-      - ./.configs/data/sonarqube-postgres-data:/var/lib/postgresql/data
-
-  sonarqube:
-    image: sonarqube:community
-    container_name: sonarqube
-    ports:
-      - "9000:9000"
-    environment:
-      SONAR_JDBC_URL: ${SONAR_JDBC_URL}
-      SONAR_JDBC_USERNAME: ${SONAR_DB_USER}
-      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD}
-      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: ${SONAR_ES_BOOTSTRAP_CHECKS_DISABLE}
-    volumes:
-      - ./.configs/data/sonarqube-data:/opt/sonarqube/data
-      - ./.configs/data/sonarqube-extensions:/opt/sonarqube/extensions
-      - ./.configs/data/sonarqube-logs:/opt/sonarqube/logs
-    depends_on:
-      - sonarqube-db
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-
-  sonar-scanner:
-    image: sonarsource/sonar-scanner-cli:11.5.0.2154_7.3.0
-    container_name: sonar-scanner
-    volumes:
-      - /Users/baotran/Documents/Rivercrane/training-management-system:/usr/src
-    working_dir: /usr/src
-    environment:
-      SONAR_HOST_URL: ${SONAR_HOST_URL}
-      SONAR_TOKEN: ${SONAR_TOKEN}
-    depends_on:
-      - sonarqube
-    command: ["sonar-scanner"]
-    stdin_open: true
-    tty: true
-
-  clamav:
-    image: clamav/clamav:latest
-    container_name: clamav
-    ports:
-      - "3310:3310"
-    volumes:
-      - ./.configs/data/clamav-data:/var/lib/clamav
-      - ./workspace:/scan/workspace:ro
-      # - /Users/baotran/Documents/Rivercrane/training-management-system:/scan/training:ro
-    environment:
-      - CLAMAV_NO_FRESHCLAMD=false
-      - CLAMAV_NO_CLAMD=false
-    restart: unless-stopped
-
-  clamav-scan:
-    image: clamav/clamav:latest
-    container_name: clamav-scan
-    volumes:
-      - ./workspace:/scan/workspace:ro
-      - /Users/baotran/Documents/Rivercrane/training-management-system:/scan/training:ro
-    command: ["clamscan", "--recursive", "--infected", "/scan"]
-    profiles:
-      - scan
-
-  jenkins:
-    build:
-      context: .configs/jenkins
-      dockerfile: Dockerfile
-    image: jenkins-docker:lts
-    container_name: jenkins
-    user: root  # Run as root to access docker socket
-    ports:
-      - "8081:8080"
-      - "50000:50000"  # JNLP port for agents
-    volumes:
-      - jenkins-data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./workspace:/var/jenkins_workspace:rw  # Access to workspace
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.LAUNCH_DIAGNOSTICS=true
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    restart: unless-stopped
+      - mysql-data:/var/lib/mysql
     networks:
-      - default
+      - bagisto-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: bagisto-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - bagisto-network
+    restart: unless-stopped
+
 volumes:
-  jenkins-data:
-  composer-cache:
-  npm-cache:
+  mysql-data:
+
+networks:
+  bagisto-network:
+    driver: bridge

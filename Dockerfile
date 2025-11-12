@@ -1,71 +1,124 @@
-# main image
-FROM php:8.3-fpm
+# ==========================================
+# Base Stage: Common dependencies for all environments
+# ==========================================
+FROM php:8.3-fpm-alpine AS base
 
-# installing main dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    ffmpeg \
-    procps
-
-# installing unzip dependencies
-RUN apt-get install -y \
+# Install runtime and build dependencies
+RUN apk add --no-cache \
+    # Runtime libraries
+    nginx \
+    libpng \
+    libjpeg-turbo \
+    freetype \
+    libzip \
+    icu-libs \
+    # Build dependencies (needed for extensions)
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
     libzip-dev \
-    zlib1g-dev \
+    icu-dev \
+    git \
     unzip
 
-# gd extension configure and install
-RUN apt-get install -y \
-    libfreetype6-dev \
-    libicu-dev \
-    libgmp-dev \
-    libjpeg62-turbo-dev \
-    libpng-dev \
-    libwebp-dev \
-    libxpm-dev
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp && docker-php-ext-install gd
+# Install PHP extensions (same across all environments)
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
+    docker-php-ext-install -j$(nproc) \
+        pdo_mysql \
+        calendar \
+        intl \
+        gd \
+        zip \
+        exif \
+        pcntl \
+        bcmath
 
-# imagick extension configure and install
-RUN apt-get install -y libmagickwand-dev \
-    && pecl install imagick \
-    && docker-php-ext-enable imagick
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# intl extension configure and install
-RUN docker-php-ext-configure intl && docker-php-ext-install intl
+# Install Node.js and npm
+RUN apk add --no-cache nodejs npm
 
-# other extensions install
-RUN docker-php-ext-install bcmath calendar exif gmp mysqli pdo pdo_mysql zip
+WORKDIR /var/www/html
 
-# installing composer
-COPY --from=composer:2.7 /usr/bin/composer /usr/local/bin/composer
+# ==========================================
+# Dependencies Stage: Install dependencies (cached separately)
+# ==========================================
+FROM base AS dependencies
 
-# installing node js
-COPY --from=node:23 /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=node:23 /usr/local/bin/node /usr/local/bin/node
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+# Copy dependency files first (for layer caching)
+COPY workspace/bagisto/composer.json workspace/bagisto/composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader --no-interaction
 
-# installing global node dependencies
-RUN npm install -g npx
-RUN npm install -g laravel-echo-server
+COPY workspace/bagisto/package.json workspace/bagisto/package-lock.json ./
+RUN npm ci --prefer-offline
 
-# arguments
-ARG container_project_path
-ARG uid
-ARG user
+# ==========================================
+# Development Stage: For local development with hot reload
+# ==========================================
+FROM base AS development
 
-# copy php-fpm pool configuration
-COPY ./.configs/nginx/pools/www.cnf /usr/local/etc/php-fpm.d/www.conf
+# Install development tools
+RUN apk add --no-cache $PHPIZE_DEPS && \
+    pecl install xdebug && \
+    docker-php-ext-enable xdebug
 
-# adding user
-RUN useradd -G www-data,root -u $uid -d /home/$user $user
-RUN mkdir -p /home/$user/.composer && \
-    chown -R $user:$user /home/$user
+# Configure Xdebug
+RUN echo "xdebug.mode=debug" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
+    echo "xdebug.client_host=host.docker.internal" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
+    echo "xdebug.client_port=9003" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
+    echo "xdebug.start_with_request=yes" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
 
-# setting up project from `src` folder
-RUN chmod -R 775 $container_project_path
-RUN chown -R $user:www-data $container_project_path
+# Copy nginx config for development
+COPY .configs/nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-# changing user
-USER $user
+# Development runs with mounted volumes, no need to copy code
+WORKDIR /var/www/html
 
-# setting work directory
-WORKDIR $container_project_path
+EXPOSE 9000 80
+
+CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
+
+# ==========================================
+# Builder Stage: Build assets
+# ==========================================
+FROM dependencies AS builder
+
+# Copy all source code
+COPY workspace/bagisto/ .
+
+# Install dependencies with scripts
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Build frontend assets
+RUN npm run build && rm -rf node_modules
+
+# Remove wrong symlink created by Bagisto installer
+RUN rm -f public/storage
+
+# ==========================================
+# Production Stage: Optimized for production
+# ==========================================
+FROM base AS production
+
+# Copy PHP extensions and configs from base
+COPY --from=base /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=base /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+
+# Copy built application from builder
+COPY --from=builder /var/www/html /var/www/html
+
+# Create correct storage symlink with relative path
+RUN ln -s ../storage/app/public public/storage && \
+    chown -R www-data:www-data /var/www/html && \
+    chmod -R 775 storage bootstrap/cache
+
+# Copy nginx configuration
+RUN mkdir -p /var/cache/nginx/client_temp /var/log/nginx /var/run && \
+    rm -f /etc/nginx/conf.d/default.conf
+
+COPY deploy/nginx.production.conf /etc/nginx/nginx.conf
+
+EXPOSE 80
+
+CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]

@@ -13,7 +13,7 @@ This setup follows CI/CD best practices:
 ## 🏗️ Architecture
 
 ```
-Dockerfile.unified:
+Dockerfile:
   ├── base        → Common PHP + extensions
   ├── dependencies → Composer + npm install (CACHED)
   ├── development → + Xdebug, volume mounting
@@ -28,7 +28,7 @@ Dockerfile.unified:
 ### Development (Local)
 ```bash
 # Use development environment
-docker-compose -f docker-compose.unified.yml --env-file .env.development up
+docker-compose --env-file .env.dev up
 
 # Code is mounted from ./workspace/bagisto (hot reload)
 # Xdebug enabled on port 9003
@@ -37,7 +37,7 @@ docker-compose -f docker-compose.unified.yml --env-file .env.development up
 ### Production (Deployment)
 ```bash
 # Use production environment
-docker-compose -f docker-compose.unified.yml --env-file .env.production up -d
+docker-compose --env-file .env.prod up -d
 
 # Code is baked into image (no volume mount)
 # Optimized for performance
@@ -46,7 +46,7 @@ docker-compose -f docker-compose.unified.yml --env-file .env.production up -d
 ### CI/CD Testing
 ```bash
 # Build and test with EXACT production target
-docker build --target production -t bagisto:test -f Dockerfile.unified .
+docker build --target production -t bagisto:test -f Dockerfile .
 docker run bagisto:test vendor/bin/pest
 ```
 
@@ -98,8 +98,8 @@ ssh root@vps 'cat /var/log/bagisto-deployments.log'
 
 # Rollback to specific version
 ssh root@vps 'cd /root/bagisto && \
-  sed -i "s|image: .*|image: bao110304/bagisto:219-xyz789|" docker-compose.unified.yml && \
-  docker-compose -f docker-compose.unified.yml up -d'
+  sed -i "s|image: .*|image: bao110304/bagisto:219-xyz789|" docker-compose.yml && \
+  docker-compose up -d'
 ```
 
 ---
@@ -117,17 +117,16 @@ ssh root@vps 'cd /root/bagisto && \
 
 ## 🚨 Migration Guide
 
-### Old Files (DELETE)
-- ❌ `Dockerfile`
+### Old Files (DELETED ✅)
+- ❌ `Dockerfile.ci`
 - ❌ `deploy/Dockerfile.production`
-- ❌ `docker-compose.yml`
 - ❌ `docker-compose.production.yml`
 
-### New Files (USE)
-- ✅ `Dockerfile.unified`
-- ✅ `docker-compose.unified.yml`
-- ✅ `.env.development`
-- ✅ `.env.production`
+### New Files (ACTIVE ✅)
+- ✅ `Dockerfile` (unified with multi-stage)
+- ✅ `docker-compose.yml` (unified)
+- ✅ `.env.dev`
+- ✅ `.env.prod`
 
 ---
 

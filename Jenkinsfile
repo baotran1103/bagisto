@@ -198,7 +198,7 @@ pipeline {
                             --target production \
                             -t ${imageName} \
                             -t ${imageLatest} \
-                            -f Dockerfile.unified \
+                            -f Dockerfile \
                             .
                     """
                     
@@ -283,10 +283,10 @@ pipeline {
                                 docker pull ${deployImage}
                                 
                                 echo "📝 Updating docker-compose to use version ${deployTag}..."
-                                sed -i 's|image: bao110304/bagisto:.*|image: ${deployImage}|' docker-compose.production.yml
+                                sed -i 's|image: bao110304/bagisto:.*|image: ${deployImage}|' docker-compose.yml
                                 
                                 echo "🔄 Deploying version ${deployTag}..."
-                                docker-compose -f docker-compose.production.yml up -d --force-recreate bagisto
+                                docker-compose up -d --force-recreate bagisto
                                 
                                 echo "📋 Recording deployment..."
                                 echo "\$(date '+%Y-%m-%d %H:%M:%S') - Deployed: ${deployTag}" >> /var/log/bagisto-deployments.log
@@ -296,7 +296,7 @@ pipeline {
                                 
                                 echo "✅ Deployment completed successfully!"
                                 echo "📊 Current deployment:"
-                                docker-compose -f docker-compose.production.yml ps
+                                docker-compose ps
                                 echo ""
                                 echo "📜 Recent deployments:"
                                 tail -5 /var/log/bagisto-deployments.log
