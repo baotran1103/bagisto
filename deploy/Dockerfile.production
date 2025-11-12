@@ -16,8 +16,6 @@ RUN apk add --no-cache \
     npm
 
 # Install missing PHP extensions required by composer.json + commonly used
-# Already in base: mbstring, curl, openssl, PDO, tokenizer
-# Need to install: pdo_mysql, calendar, intl, gd (images), zip (exports), exif (images), pcntl (queue), bcmath (currency)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) pdo_mysql calendar intl gd zip exif pcntl bcmath
 
@@ -26,22 +24,22 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /build
 
-# Copy source code first (needed for composer post-install scripts)
 COPY workspace/bagisto/ .
 
-# Install dependencies (keep devDependencies for build)
+# Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction && \
     npm ci --prefer-offline
 
-# Build frontend assets
 RUN npm run build && rm -rf node_modules
+
+# Remove wrong symlink created by Bagisto installer
+RUN rm -f public/storage
 
 # ==========================================
 # Stage 2: Production Image
 # ==========================================
 FROM php:8.3-fpm-alpine
 
-# Install only missing runtime libraries (libxml2, oniguruma already in base)
 RUN apk add --no-cache \
     nginx \
     libpng \
@@ -52,17 +50,13 @@ RUN apk add --no-cache \
 
 WORKDIR /var/www/html
 
-# Copy PHP extensions from builder (avoid recompiling)
 COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Copy application from builder (copy contents, not directory)
 COPY --from=builder /build/. /var/www/html/
 
-# Create users and set permissions
-# PHP-FPM runs as www-data (uid 82), nginx as nginx (uid 101)
-RUN adduser -D -H -u 82 -s /sbin/nologin www-data 2>/dev/null || true && \
-    adduser -D -H -u 101 -s /sbin/nologin -G www-data nginx 2>/dev/null || true && \
+# Create correct storage symlink with relative path
+RUN ln -s ../../storage/app/public public/storage && \
     chown -R www-data:www-data /var/www/html && \
     chmod -R 775 storage bootstrap/cache
 
