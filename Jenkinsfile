@@ -148,9 +148,11 @@ pipeline {
                     def imageLatest = "${DOCKER_IMAGE}:latest"
                     
                     echo "📦 Building PRODUCTION image (clean, no build tools)..."
+                    echo "💡 Using build-${env.BUILD_TAG} as cache (fast build!)"
                     sh """
                         docker build \
                             --target production \
+                            --cache-from ${DOCKER_IMAGE}:build-${BUILD_TAG} \
                             -t ${imageName} \
                             -t ${imageLatest} \
                             -f Dockerfile \
@@ -158,6 +160,7 @@ pipeline {
                     """
                     
                     echo "✅ Production image built: ${imageName}"
+                    echo "⚡ Build was super fast thanks to cache reuse!"
                 }
             }
         }
