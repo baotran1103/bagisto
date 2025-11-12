@@ -47,8 +47,8 @@ RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader
 COPY workspace/bagisto/package.json workspace/bagisto/package-lock.json ./
 RUN npm ci --prefer-offline
 
-# 4. Builder Stage
-FROM build_base AS builder
+# 4. Build Stage (for CI testing)
+FROM build_base AS build
 
 COPY --from=dependencies /var/www/html/vendor /var/www/html/vendor
 COPY --from=dependencies /var/www/html/node_modules /var/www/html/node_modules
@@ -67,8 +67,8 @@ WORKDIR /var/www/html
 COPY --from=build_base /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=build_base /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Copy code đã build từ 'builder'
-COPY --from=builder /var/www/html /var/www/html
+# Copy code đã build từ 'build'
+COPY --from=build /var/www/html /var/www/html
 
 RUN ln -s ../storage/app/public public/storage && \
     chown -R www-data:www-data /var/www/html && \
