@@ -66,8 +66,11 @@ pipeline {
                             echo "📊 Running SonarQube scan..."
                             try {
                                 def scannerHome = tool 'SonarScanner'
+                                echo "🔍 Scanner home: ${scannerHome}"
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
+                                        echo "Scanner path: \${scannerHome}"
+                                        ls -la \${scannerHome}/bin/ || echo "Path not found"
                                         \${scannerHome}/bin/sonar-scanner \\
                                             -Dsonar.projectKey=bagisto \\
                                             -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
@@ -86,12 +89,12 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            echo "🦠 Running ClamAV scan in Docker container..."
+                            echo "🦠 Running ClamAV malware scan..."
                             def scanResult = sh(
                                 script: """
-                                    docker run --rm -v \$(pwd):/workspace \
+                                    docker run --rm -v \$(pwd)/workspace/bagisto:/workspace \
                                         clamav/clamav:latest \
-                                        clamscan -r --exclude-dir=vendor --exclude-dir=node_modules /workspace || true
+                                        clamscan -r -i --exclude-dir=vendor --exclude-dir=node_modules /workspace
                                 """,
                                 returnStatus: true
                             )
@@ -99,7 +102,7 @@ pipeline {
                             if (scanResult == 1) {
                                 error "❌ CRITICAL: Malware/virus detected! Build aborted."
                             } else if (scanResult != 0) {
-                                echo "⚠️ ClamAV completed with warnings"
+                                echo "⚠️ ClamAV completed with warnings (database old or other issues)"
                             } else {
                                 echo "✅ No malware detected"
                             }
