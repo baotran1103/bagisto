@@ -63,13 +63,13 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            echo "📊 Running SonarQube scan in Docker..."
+                            echo "📊 Running SonarQube scan..."
                             try {
-                                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                                withSonarQubeEnv('SonarQube') {
                                     sh """
                                         docker run --rm \\
-                                            -e SONAR_HOST_URL=http://host.docker.internal:9000 \\
-                                            -e SONAR_TOKEN=\${SONAR_TOKEN} \\
+                                            -e SONAR_HOST_URL=\${SONAR_HOST_URL} \\
+                                            -e SONAR_AUTH_TOKEN=\${SONAR_AUTH_TOKEN} \\
                                             -v \$(pwd)/workspace/bagisto:/usr/src \\
                                             -w /usr/src \\
                                             sonarsource/sonar-scanner-cli \\
@@ -80,8 +80,7 @@ pipeline {
                                 }
                                 echo "✅ SonarQube scan completed"
                             } catch (Exception e) {
-                                echo "⚠️ SonarQube failed: ${e.message}"
-                                echo "Check if SonarQube server is running at http://host.docker.internal:9000"
+                                echo "⚠️ SonarQube scan failed: ${e.message}"
                             }
                         }
                     }
