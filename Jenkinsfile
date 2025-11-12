@@ -70,10 +70,11 @@ pipeline {
                                         docker run --rm \\
                                             -e SONAR_HOST_URL=http://host.docker.internal:9000 \\
                                             -e SONAR_TOKEN=\${SONAR_TOKEN} \\
-                                            -v \$(pwd):/usr/src \\
+                                            -v \$(pwd)/workspace/bagisto:/usr/src \\
+                                            -w /usr/src \\
                                             sonarsource/sonar-scanner-cli \\
                                             -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
+                                            -Dsonar.sources=app,packages/Webkul \\
                                             -Dsonar.exclusions=**/vendor/**,**/node_modules/**,**/storage/**,**/public/**,**/tests/**
                                     """
                                 }
