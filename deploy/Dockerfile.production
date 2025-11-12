@@ -56,7 +56,7 @@ COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 COPY --from=builder /build/. /var/www/html/
 
 # Create correct storage symlink with relative path
-RUN ln -s ../../storage/app/public public/storage && \
+RUN ln -s ../storage/app/public public/storage && \
     chown -R www-data:www-data /var/www/html && \
     chmod -R 775 storage bootstrap/cache
 
