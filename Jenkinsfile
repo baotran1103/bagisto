@@ -208,12 +208,32 @@ pipeline {
         
         stage('Image Security Scan') {
             agent any
-            when {
-                expression { return false }  // Skip for now
-            }
             steps {
                 script {
-                    echo "⚠️ Image security scan is currently disabled"
+                    echo "🔍 Scanning Docker image for vulnerabilities with Trivy..."
+                    
+                    def imageName = "${DOCKER_IMAGE}:${env.BUILD_TAG}"
+                    
+                    // Scan image using Trivy Docker container (no installation needed)
+                    def scanResult = sh(
+                        script: """
+                            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
+                                aquasec/trivy:latest image \\
+                                --severity HIGH,CRITICAL \\
+                                --exit-code 0 \\
+                                --format table \\
+                                --no-progress \\
+                                ${imageName}
+                        """,
+                        returnStatus: true
+                    )
+                    
+                    if (scanResult != 0) {
+                        unstable("⚠️ Image security scan found vulnerabilities (HIGH/CRITICAL)")
+                        echo "⚠️ Review vulnerabilities above before deploying to production"
+                    } else {
+                        echo "✅ No critical vulnerabilities found in image"
+                    }
                 }
             }
         }
