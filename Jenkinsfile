@@ -65,22 +65,18 @@ pipeline {
                         script {
                             echo "📊 Running SonarQube scan..."
                             try {
+                                def scannerHome = tool 'SonarScanner'
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
-                                        docker run --rm \\
-                                            -e SONAR_HOST_URL=\${SONAR_HOST_URL} \\
-                                            -e SONAR_AUTH_TOKEN=\${SONAR_AUTH_TOKEN} \\
-                                            -v \$(pwd)/workspace/bagisto:/usr/src \\
-                                            -w /usr/src \\
-                                            sonarsource/sonar-scanner-cli \\
+                                        \${scannerHome}/bin/sonar-scanner \\
                                             -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.sources=app,packages/Webkul \\
-                                            -Dsonar.exclusions=**/vendor/**,**/node_modules/**,**/storage/**,**/public/**,**/tests/**
+                                            -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
+                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
                                     """
                                 }
                                 echo "✅ SonarQube scan completed"
                             } catch (Exception e) {
-                                echo "⚠️ SonarQube scan failed: ${e.message}"
+                                echo "⚠️ SonarQube skipped: ${e.message}"
                             }
                         }
                     }
