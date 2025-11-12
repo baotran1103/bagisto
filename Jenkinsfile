@@ -69,9 +69,10 @@ pipeline {
                                 echo "🔍 Scanner home: ${scannerHome}"
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
-                                        echo "Scanner path: \${scannerHome}"
-                                        ls -la \${scannerHome}/bin/ || echo "Path not found"
-                                        \${scannerHome}/bin/sonar-scanner \\
+                                        export SCANNER_HOME='${scannerHome}'
+                                        echo "Scanner path: \$SCANNER_HOME"
+                                        ls -la \$SCANNER_HOME/bin/ || echo "Path not found"
+                                        \$SCANNER_HOME/bin/sonar-scanner \\
                                             -Dsonar.projectKey=bagisto \\
                                             -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
                                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
