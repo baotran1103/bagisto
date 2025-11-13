@@ -69,11 +69,9 @@ pipeline {
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
                                         export SCANNER_HOME='${scannerHome}'
-                                        echo "Scanner path: \$SCANNER_HOME"
-                                        ls -la \$SCANNER_HOME/bin/ || echo "Path not found"
                                         \$SCANNER_HOME/bin/sonar-scanner \\
                                             -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.sources=bagisto/app,bagisto/packages/Webkul \\
+                                            -Dsonar.sources=app,packages/Webkul \\
                                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
                                     """
                                 }
@@ -96,7 +94,7 @@ pipeline {
                                         -u root \\
                                         -v \${WORKSPACE}:/workspace \\
                                         clamav/clamav:latest \\
-                                        sh -c 'freshclam && clamscan -r -i /workspace/bagisto --exclude-dir=vendor --exclude-dir=node_modules'
+                                        sh -c 'freshclam && clamscan -r -i /workspace --exclude-dir=/workspace/vendor --exclude-dir=/workspace/node_modules'
                                 """,
                                 returnStatus: true
                             )
