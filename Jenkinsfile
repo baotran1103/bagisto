@@ -64,17 +64,12 @@ pipeline {
                         script {
                             echo "📊 Running SonarQube scan via container..."
                             
-                            // Get the job folder name
-                            def jobFolder = env.JOB_NAME
-                            
                             try {
-                                
-                                // Run scan from inside SonarQube container
-                                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                                     sh """
                                         docker exec sonarqube sonar-scanner \
                                             -Dsonar.projectKey=bagisto \
-                                            -Dsonar.sources=/code/${jobFolder}/app,/code/${jobFolder}/packages/Webkul \
+                                            -Dsonar.sources=/code/workspace/bagisto/app,/code/workspace/bagisto/packages/Webkul \
                                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/** \
                                             -Dsonar.host.url=http://localhost:9000 \
                                             -Dsonar.token=${SONAR_TOKEN}
@@ -95,19 +90,15 @@ pipeline {
                         script {
                             echo "🦠 Running ClamAV malware scan using shared volume..."
                             
-                            // Get the job folder name
-                            def jobFolder = env.JOB_NAME
-                            
                             def scanResult = sh(
                                 script: """
-                                    docker exec clamav clamscan \
-                                        --recursive \
-                                        --infected \
-                                        --exclude-dir=.git \
-                                        --exclude-dir=vendor \
-                                        --exclude-dir=node_modules \
-                                        --exclude-dir=storage \
-                                        /scan/${jobFolder}
+                                    docker exec clamav \\
+                                        clamscan -r -i /scan/Bagisto/workspace/bagisto \\
+                                        --max-filesize=50M \\
+                                        --max-scansize=100M \\
+                                        --exclude-dir=vendor \\
+                                        --exclude-dir=node_modules \\
+                                        --exclude-dir=.git
                                 """,
                                 returnStatus: true
                             )
