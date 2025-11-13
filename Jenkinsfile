@@ -93,7 +93,7 @@ pipeline {
                             echo "🦠 Running ClamAV malware scan..."
                             def scanResult = sh(
                                 script: """
-                                    docker run --rm -v \$(pwd)/workspace/bagisto:/workspace \
+                                    docker run --rm -v ${WORKSPACE}/workspace/bagisto:/workspace \
                                         clamav/clamav:latest \
                                         clamscan -r -i --exclude-dir=vendor --exclude-dir=node_modules /workspace
                                 """,
