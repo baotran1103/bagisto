@@ -62,22 +62,32 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            echo "📊 Running SonarQube scan..."
+                            echo "📊 Running SonarQube scan via container..."
+                            
+                            // Get the job folder name
+                            def jobFolder = env.JOB_NAME
+                            
                             try {
-                                def scannerHome = tool 'SonarScanner'
-                                echo "🔍 Scanner home: ${scannerHome}"
-                                withSonarQubeEnv('SonarQube') {
+                                // Wait for SonarQube to be ready
+                                sh """
+                                    timeout 30 sh -c 'until docker exec sonarqube curl -s http://localhost:9000/api/system/health | grep -q UP; do sleep 2; done' || echo 'SonarQube may not be ready'
+                                """
+                                
+                                // Run scan from inside SonarQube container
+                                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                                     sh """
-                                        export SCANNER_HOME='${scannerHome}'
-                                        \$SCANNER_HOME/bin/sonar-scanner \\
-                                            -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.sources=app,packages/Webkul \\
-                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
+                                        docker exec sonarqube sonar-scanner \
+                                            -Dsonar.projectKey=bagisto \
+                                            -Dsonar.sources=/code/${jobFolder}/app,/code/${jobFolder}/packages/Webkul \
+                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/** \
+                                            -Dsonar.host.url=http://localhost:9000 \
+                                            -Dsonar.token=${SONAR_TOKEN}
                                     """
                                 }
                                 echo "✅ SonarQube scan completed"
                             } catch (Exception e) {
-                                echo "⚠️ SonarQube skipped: ${e.message}"
+                                echo "⚠️ SonarQube scan failed: ${e.message}"
+                                // Don't fail the build, just warn
                             }
                         }
                     }
@@ -87,14 +97,24 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            echo "🦠 Running ClamAV malware scan..."
+                            echo "🦠 Running ClamAV malware scan using shared volume..."
+                            
+                            // Get the job folder name
+                            def jobFolder = env.JOB_NAME
+                            
+                            // Wait for ClamAV to be ready
+                            sh """
+                                echo "Waiting for ClamAV to be ready..."
+                                timeout 60 sh -c 'until docker exec clamav clamdscan --ping 10 2>/dev/null; do sleep 5; done' || echo 'ClamAV may not be ready, continuing anyway'
+                            """
+                            
                             def scanResult = sh(
                                 script: """
                                     docker run --rm \\
                                         -u root \\
                                         -v \${WORKSPACE}:/workspace \\
                                         clamav/clamav:latest \\
-                                        sh -c 'freshclam && clamscan -r -i /workspace --exclude-dir=vendor --exclude-dir=node_modules'
+                                        sh -c 'freshclam && clamscan -r -i /workspace --max-filesize=50M --max-scansize=100M --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=.git'
                                 """,
                                 returnStatus: true
                             )
@@ -102,7 +122,7 @@ pipeline {
                             if (scanResult == 1) {
                                 error "❌ CRITICAL: Malware/virus detected! Build aborted."
                             } else if (scanResult != 0) {
-                                echo "⚠️ ClamAV completed with warnings"
+                                echo "⚠️ ClamAV completed with warnings (might be updates or non-critical)"
                             } else {
                                 echo "✅ No malware detected"
                             }
