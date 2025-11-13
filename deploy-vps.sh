@@ -15,8 +15,8 @@ echo "🚀 Deploying Bagisto to VPS ${VPS_HOST}"
 echo "📦 Image: ${DOCKER_IMAGE}"
 
 # Copy docker-compose file to VPS
-echo "📤 Uploading docker-compose.production.yml..."
-scp docker-compose.production.yml ${VPS_USER}@${VPS_HOST}:/root/bagisto/
+echo "📤 Uploading docker-compose.yml..."
+scp docker-compose.yml ${VPS_USER}@${VPS_HOST}:/root/bagisto/
 
 # Deploy on VPS
 echo "🔄 Deploying on VPS..."
@@ -29,53 +29,46 @@ ssh ${VPS_USER}@${VPS_HOST} << EOF
   docker pull ${DOCKER_IMAGE}
   
   # Update docker-compose to use specific tag
-  sed -i "s|image: bao110304/bagisto:.*|image: ${DOCKER_IMAGE}|g" docker-compose.production.yml
+  sed -i "s|image: bao110304/bagisto:.*|image: ${DOCKER_IMAGE}|g" docker-compose.yml
   
   # Stop old containers
   echo "🛑 Stopping old containers..."
-  docker-compose -f docker-compose.production.yml down || true
+  docker-compose -f docker-compose.yml down || true
   
   # Start new containers
   echo "▶️  Starting new containers..."
-  docker-compose -f docker-compose.production.yml up -d
-  
+  docker-compose -f docker-compose.yml up -d
+
   # Wait for services
   echo "⏳ Waiting for services to be ready..."
   sleep 10
   
   # Fix permissions (ensure www-data owns storage and cache)
   echo "🔐 Fixing permissions..."
-  docker-compose -f docker-compose.production.yml exec -T bagisto chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache || true
-  docker-compose -f docker-compose.production.yml exec -T bagisto chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
+  docker-compose -f docker-compose.yml exec -T bagisto chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache || true
+  docker-compose -f docker-compose.yml exec -T bagisto chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
   
   # Run migrations (only on first deploy or when needed)
   echo "🔧 Running migrations..."
-  docker-compose -f docker-compose.production.yml exec -T bagisto php artisan migrate --force || echo "⚠️  Migrations skipped or failed"
+  docker-compose -f docker-compose.yml exec -T bagisto php artisan migrate --force || echo "⚠️  Migrations skipped or failed"
   
   # Clear cache
   echo "🧹 Clearing cache..."
-  docker-compose -f docker-compose.production.yml exec -T bagisto php artisan cache:clear || true
-  docker-compose -f docker-compose.production.yml exec -T bagisto php artisan config:clear || true
-  docker-compose -f docker-compose.production.yml exec -T bagisto php artisan route:clear || true
+  docker-compose -f docker-compose.yml exec -T bagisto php artisan cache:clear || true
+  docker-compose -f docker-compose.yml exec -T bagisto php artisan config:clear || true
+  docker-compose -f docker-compose.yml exec -T bagisto php artisan route:clear || true
   
   # Check status
   echo "✅ Deployment status:"
-  docker-compose -f docker-compose.production.yml ps
-  
+  docker-compose -f docker-compose.yml ps
+
   # Cleanup old images
   echo "🧹 Cleaning up old images..."
   docker image prune -f
 EOF
 
 echo ""
-echo "═══════════════════════════════════════"
 echo "✅ Deployment Complete!"
-echo "═══════════════════════════════════════"
 echo "🌐 Application URL: http://${VPS_HOST}"
 echo "📦 Image deployed: ${DOCKER_IMAGE}"
 echo ""
-echo "Useful commands on VPS:"
-echo "  docker-compose -f docker-compose.production.yml logs -f bagisto"
-echo "  docker-compose -f docker-compose.production.yml ps"
-echo "  docker-compose -f docker-compose.production.yml restart"
-echo "═══════════════════════════════════════"

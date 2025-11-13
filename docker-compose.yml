@@ -5,7 +5,7 @@ services:
     image: ${DOCKER_IMAGE:-bao110304/bagisto:latest}
     build:
       context: .
-      dockerfile: Dockerfile.unified
+      dockerfile: Dockerfile
       target: ${BUILD_TARGET:-development}
     container_name: bagisto-app
     ports:
@@ -23,9 +23,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-bagisto_password}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
-    volumes:
-      # Conditional mount: only in development
-      - ${SOURCE_MOUNT:-./empty}:/var/www/html:${MOUNT_MODE:-rw}
+    # volumes:
+      # Conditional mount: only in development when SOURCE_MOUNT is set
+      # - ${SOURCE_MOUNT}:/var/www/html:${MOUNT_MODE:-rw}
     depends_on:
       mysql:
         condition: service_healthy
