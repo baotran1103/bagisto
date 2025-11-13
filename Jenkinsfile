@@ -71,7 +71,7 @@ pipeline {
                                         export SCANNER_HOME='${scannerHome}'
                                         \$SCANNER_HOME/bin/sonar-scanner \\
                                             -Dsonar.projectKey=bagisto \\
-                                            -Dsonar.sources=app,packages/Webkul \\
+                                            -Dsonar.sources=workspace/bagisto/app,workspace/bagisto/packages/Webkul \\
                                             -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/**
                                     """
                                 }
@@ -94,7 +94,7 @@ pipeline {
                                         -u root \\
                                         -v \${WORKSPACE}:/workspace \\
                                         clamav/clamav:latest \\
-                                        sh -c 'freshclam && clamscan -r -i /workspace --exclude-dir=/workspace/vendor --exclude-dir=/workspace/node_modules'
+                                        sh -c 'freshclam && clamscan -r -i /workspace/workspace/bagisto --exclude-dir=vendor --exclude-dir=node_modules'
                                 """,
                                 returnStatus: true
                             )
