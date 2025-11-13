@@ -145,7 +145,17 @@ services:
         soft: 65536
         hard: 65536
 
-  # REMOVED: sonar-scanner service (use docker exec from Jenkins instead)
+  sonar-scanner:
+    image: sonarsource/sonar-scanner-cli:latest
+    container_name: sonar-scanner
+    volumes:
+      - jenkins-workspace:/usr/src
+    depends_on:
+      - sonarqube
+    command: ["sonar-scanner", "-Dproject.settings=/usr/src/sonar-project.properties", "-Dsonar.host.url=http://sonarqube:9000"]
+    profiles:
+      - scan
+
 
   clamav:
     image: clamav/clamav:latest
@@ -172,7 +182,7 @@ services:
     container_name: clamav-scan
     volumes:
       - jenkins-workspace:/scan:ro
-    command: ["clamscan", "--recursive", "--infected", "--max-filesize=50M", "--max-scansize=100M", "--exclude-dir=vendor", "--exclude-dir=node_modules", "--exclude-dir=.git", "/scan"]
+    command: ["clamscan", "--recursive", "--infected", "--max-filesize=50M", "--max-scansize=100M", "--exclude-dir=vendor", "--exclude-dir=node_modules", "--exclude-dir=.git", "/scan/Bagisto/workspace/bagisto"]
     profiles:
       - scan
 
