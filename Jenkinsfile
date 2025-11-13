@@ -242,13 +242,15 @@ pipeline {
                                 echo "📥 Pulling specific version: ${deployImage}"
                                 docker pull ${deployImage}
                                 
-                                echo "📝 Updating docker-compose to use version ${deployTag}..."
-                                sed -i 's|image: bao110304/bagisto:.*|image: ${deployImage}|' docker-compose.yml
+                                echo "📝 Updating .env to use version ${deployTag}..."
+                                sed -i 's|DOCKER_IMAGE=.*|DOCKER_IMAGE=${deployImage}|' .env
                                 
                                 echo "🔄 Deploying version ${deployTag}..."
-                                docker-compose up -d --force-recreate bagisto
+                                docker-compose down
+                                docker-compose up -d
                                 
                                 echo "📋 Recording deployment..."
+                                mkdir -p /var/log
                                 echo "\$(date '+%Y-%m-%d %H:%M:%S') - Deployed: ${deployTag}" >> /var/log/bagisto-deployments.log
                                 
                                 echo "🧹 Cleaning up old images (keeping last 5)..."
