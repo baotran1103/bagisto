@@ -2,7 +2,7 @@ pipeline {
     agent none
 
     triggers {
-        pollSCM('H/5 * * * *')
+        pollSCM('H/15 * * * *')
     }
 
     environment {
@@ -13,7 +13,6 @@ pipeline {
         stage('Checkout') {
             agent any
             steps {
-                sh 'git config --global http.postBuffer 524288000'
                 git branch: 'main',
                     credentialsId: 'GITHUB_PAT',
                     url: 'https://github.com/baotran1103/bagisto.git'
@@ -91,6 +90,7 @@ pipeline {
                     steps {
                         script {
                             echo "🦠 Running ClamAV malware scan..."
+                            
                             def scanResult = sh(
                                 script: """
                                     docker run --rm -v ${WORKSPACE}/workspace/bagisto:/workspace \
