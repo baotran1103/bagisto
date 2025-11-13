@@ -94,7 +94,7 @@ pipeline {
                                 script: """
                                     docker run --rm \\
                                         -u root \\
-                                        -v \${WORKSPACE}/workspace/bagisto:/workspace \\
+                                        -v \${WORKSPACE}:/workspace \\
                                         clamav/clamav:latest \\
                                         sh -c 'freshclam && clamscan -r -i --exclude-dir=vendor --exclude-dir=node_modules /workspace'
                                 """,
