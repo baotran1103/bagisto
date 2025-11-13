@@ -96,7 +96,7 @@ pipeline {
                                         -u root \\
                                         -v \${WORKSPACE}:/workspace \\
                                         clamav/clamav:latest \\
-                                        sh -c 'freshclam && clamscan -r -i --exclude-dir=vendor --exclude-dir=node_modules /workspace'
+                                        sh -c 'freshclam && clamscan -r -i /workspace/workspace/bagisto --exclude-dir=vendor --exclude-dir=node_modules'
                                 """,
                                 returnStatus: true
                             )
