@@ -90,10 +90,11 @@ pipeline {
                     steps {
                         script {
                             echo "🦠 Running ClamAV malware scan..."
-                            
                             def scanResult = sh(
                                 script: """
-                                    docker run --rm -v ${WORKSPACE}/workspace/bagisto:/workspace \
+                                    docker run --rm \\
+                                        -u root \\
+                                        -v ${WORKSPACE}/workspace/bagisto:/workspace \\
                                         clamav/clamav:latest \
                                         clamscan -r -i --exclude-dir=vendor --exclude-dir=node_modules /workspace
                                 """,
@@ -103,7 +104,7 @@ pipeline {
                             if (scanResult == 1) {
                                 error "❌ CRITICAL: Malware/virus detected! Build aborted."
                             } else if (scanResult != 0) {
-                                echo "⚠️ ClamAV completed with warnings (database old or other issues)"
+                                echo "⚠️ ClamAV completed with warnings"
                             } else {
                                 echo "✅ No malware detected"
                             }
