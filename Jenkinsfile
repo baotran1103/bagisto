@@ -68,13 +68,9 @@ pipeline {
                             def jobFolder = env.JOB_NAME
                             
                             try {
-                                // Wait for SonarQube to be ready
-                                sh """
-                                    timeout 30 sh -c 'until docker exec sonarqube curl -s http://localhost:9000/api/system/health | grep -q UP; do sleep 2; done' || echo 'SonarQube may not be ready'
-                                """
                                 
                                 // Run scan from inside SonarQube container
-                                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                                     sh """
                                         docker exec sonarqube sonar-scanner \
                                             -Dsonar.projectKey=bagisto \
@@ -101,12 +97,6 @@ pipeline {
                             
                             // Get the job folder name
                             def jobFolder = env.JOB_NAME
-                            
-                            // Wait for ClamAV to be ready
-                            sh """
-                                echo "Waiting for ClamAV to be ready..."
-                                timeout 60 sh -c 'until docker exec clamav clamdscan --ping 10 2>/dev/null; do sleep 5; done' || echo 'ClamAV may not be ready, continuing anyway'
-                            """
                             
                             def scanResult = sh(
                                 script: """
