@@ -119,6 +119,9 @@ pipeline {
         
         stage('Code Quality') {
             agent any
+            options {
+                skipDefaultCheckout()
+            }
             steps {
                 script {
                     echo "📊 Running SonarQube scan..."
