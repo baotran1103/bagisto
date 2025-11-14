@@ -66,12 +66,10 @@ pipeline {
                 
                 stage('Code Quality') {
                     agent any
-                    options {
-                        skipDefaultCheckout()
-                    }
                     steps {
                         script {
-                            echo "📊 Running SonarQube scan using Jenkins plugin..."
+                            echo "📊 Running SonarQube scan..."
+                            echo "📂 Workspace: ${WORKSPACE}"
                             
                             def scannerHome = tool 'SonarScanner'
                             
@@ -96,7 +94,7 @@ pipeline {
                             def scanResult = sh(
                                 script: """
                                     docker exec clamav \\
-                                        clamscan -r -i /scan/Bagisto@2 \\
+                                        clamscan -r -i /scan/\$(basename \${WORKSPACE}) \\
                                         --max-filesize=50M \\
                                         --max-scansize=100M \\
                                         --exclude-dir=vendor \\
