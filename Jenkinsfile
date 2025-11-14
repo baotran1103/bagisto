@@ -42,7 +42,7 @@ pipeline {
             }
         }
         
-        stage('Tests & Quality') {
+        stage('Tests & Security Scans') {
             parallel {
                 stage('PHPUnit Tests') {
                     agent any
@@ -58,40 +58,6 @@ pipeline {
                     }
                 }
                 
-                stage('Code Quality') {
-                    agent {
-                        docker {
-                            image 'sonarsource/sonar-scanner-cli:latest'
-                            args '-v jenkins-workspace:/usr/src:ro --network container:sonarqube -e HOME=/tmp'
-                            reuseNode true
-                        }
-                    }
-                    steps {
-                        script {
-                            echo "📊 Running SonarQube scan in Docker container..."
-                            echo "📂 Container workspace: ${WORKSPACE}"
-                            
-                            withSonarQubeEnv('SonarQube') {
-                                sh '''
-                                    # Navigate to shared volume path where code is located
-                                    cd /usr/src/Bagisto
-                                    
-                                    # Verify files exist
-                                    echo "� Checking source files..."
-                                    ls -la app/ packages/ || echo "Warning: Source directories not found"
-                                    
-                                    # Run SonarQube scanner
-                                    sonar-scanner \
-                                        -Dsonar.projectKey=bagisto \
-                                        -Dsonar.sources=app,packages/Webkul \
-                                        -Dsonar.exclusions=**/vendor/**,**/node_modules/**,**/storage/**,**/public/**,**/tests/**,**/*.blade.php
-                                '''
-                            }
-                            
-                            echo "✅ SonarQube scan completed"
-                        }
-                    }
-                }
                 
                 stage('ClamAV Malware Scan') {
                     agent any
@@ -148,6 +114,24 @@ pipeline {
                     }
                 }
                 
+            }
+        }
+        
+        stage('Code Quality') {
+            agent any
+            steps {
+                script {
+                    echo "📊 Running SonarQube scan..."
+                    echo "📂 Workspace: ${WORKSPACE}"
+                    
+                    def scannerHome = tool 'SonarScanner'
+                    
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                    
+                    echo "✅ SonarQube scan completed"
+                }
             }
         }
         
