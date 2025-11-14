@@ -239,7 +239,12 @@ pipeline {
                                 sed -i 's|DOCKER_IMAGE=.*|DOCKER_IMAGE=${deployImage}|' .env
                                 
                                 echo "🔄 Deploying version ${deployTag}..."
-                                docker-compose down
+                                docker-compose down || true
+                                
+                                echo "🧹 Cleaning up stuck networks..."
+                                docker network prune -f || true
+                                
+                                echo "▶️  Starting containers..."
                                 docker-compose up -d
                                 
                                 echo "📋 Recording deployment..."
