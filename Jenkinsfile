@@ -22,6 +22,9 @@ pipeline {
                     env.BUILD_TAG = "${BUILD_NUMBER}-${env.GIT_SHORT_COMMIT}"
                     echo "Build tag: ${env.BUILD_TAG}"
                 }
+                
+                // Stash source code for SonarQube scanning
+                stash name: 'source-code', includes: 'app/**,packages/**,sonar-project.properties', excludes: '**/vendor/**,**/node_modules/**'
             }
         }
         
@@ -61,6 +64,9 @@ pipeline {
                 stage('Code Quality') {
                     agent any
                     steps {
+                        // Unstash source code để scan
+                        unstash 'source-code'
+                        
                         script {
                             echo "📊 Running SonarQube scan..."
                             echo "📂 Workspace: ${WORKSPACE}"
