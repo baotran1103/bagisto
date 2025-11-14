@@ -24,7 +24,7 @@ pipeline {
                 }
                 
                 // Stash source code for SonarQube scanning
-                stash name: 'source-code', includes: 'app/**,packages/**,sonar-project.properties', excludes: '**/vendor/**,**/node_modules/**'
+                stash name: 'source-code', includes: '**', excludes: '**/vendor/**,**/node_modules/**,**/.git/**,**/storage/**,**/public/**,**/bootstrap/cache/**'
             }
         }
         
