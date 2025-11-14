@@ -22,9 +22,6 @@ pipeline {
                     env.BUILD_TAG = "${BUILD_NUMBER}-${env.GIT_SHORT_COMMIT}"
                     echo "Build tag: ${env.BUILD_TAG}"
                 }
-                
-                // Stash source code for SonarQube scanning
-                stash name: 'source-code', includes: '**', excludes: '**/vendor/**,**/node_modules/**,**/.git/**,**/storage/**,**/public/**,**/bootstrap/cache/**'
             }
         }
         
@@ -62,19 +59,33 @@ pipeline {
                 }
                 
                 stage('Code Quality') {
-                    agent any
+                    agent {
+                        docker {
+                            image 'sonarsource/sonar-scanner-cli:latest'
+                            args '-v jenkins-workspace:/usr/src:ro --network container:sonarqube -e HOME=/tmp'
+                            reuseNode true
+                        }
+                    }
                     steps {
-                        // Unstash source code để scan
-                        unstash 'source-code'
-                        
                         script {
-                            echo "📊 Running SonarQube scan..."
-                            echo "📂 Workspace: ${WORKSPACE}"
-                            
-                            def scannerHome = tool 'SonarScanner'
+                            echo "📊 Running SonarQube scan in Docker container..."
+                            echo "📂 Container workspace: ${WORKSPACE}"
                             
                             withSonarQubeEnv('SonarQube') {
-                                sh "${scannerHome}/bin/sonar-scanner"
+                                sh '''
+                                    # Navigate to shared volume path where code is located
+                                    cd /usr/src/Bagisto
+                                    
+                                    # Verify files exist
+                                    echo "� Checking source files..."
+                                    ls -la app/ packages/ || echo "Warning: Source directories not found"
+                                    
+                                    # Run SonarQube scanner
+                                    sonar-scanner \
+                                        -Dsonar.projectKey=bagisto \
+                                        -Dsonar.sources=app,packages/Webkul \
+                                        -Dsonar.exclusions=**/vendor/**,**/node_modules/**,**/storage/**,**/public/**,**/tests/**,**/*.blade.php
+                                '''
                             }
                             
                             echo "✅ SonarQube scan completed"
