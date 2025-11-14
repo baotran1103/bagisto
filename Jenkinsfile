@@ -84,7 +84,7 @@ pipeline {
                             def scanResult = sh(
                                 script: """
                                     docker exec clamav \\
-                                        clamscan -r -i /scan/Bagisto/workspace/bagisto \\
+                                        clamscan -r -i /scan/Bagisto@2 \\
                                         --max-filesize=50M \\
                                         --max-scansize=100M \\
                                         --exclude-dir=vendor \\
