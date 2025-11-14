@@ -127,6 +127,16 @@ pipeline {
                     echo "📊 Running SonarQube scan..."
                     echo "📂 Workspace: ${WORKSPACE}"
                     
+                    // Debug: Check if source files exist
+                    sh """
+                        echo "=== Checking workspace contents ==="
+                        ls -la ${WORKSPACE}/ || true
+                        echo "=== Checking app directory ==="
+                        ls -la ${WORKSPACE}/app/ || echo "app/ not found"
+                        echo "=== Checking packages directory ==="
+                        ls -la ${WORKSPACE}/packages/ || echo "packages/ not found"
+                    """
+                    
                     def scannerHome = tool 'SonarScanner'
                     
                     withSonarQubeEnv('SonarQube') {
