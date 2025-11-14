@@ -67,7 +67,7 @@ pipeline {
                             def scannerHome = tool 'SonarScanner'
                             
                             withSonarQubeEnv('SonarQube') {
-                                sh "cd workspace && ${scannerHome}/bin/sonar-scanner"
+                                sh "${scannerHome}/bin/sonar-scanner"
                             }
                             
                             echo "✅ SonarQube scan completed"
