@@ -27,9 +27,6 @@ pipeline {
         
         stage('Build Test Image') {
             agent any
-            options {
-                skipDefaultCheckout()
-            }
             steps {
                 script {
                     echo "🏗️ Building BUILD stage (has all tools for testing)..."
@@ -49,9 +46,6 @@ pipeline {
             parallel {
                 stage('PHPUnit Tests') {
                     agent any
-                    options {
-                        skipDefaultCheckout()
-                    }
                     steps {
                         script {
                             echo "🧪 Running tests INSIDE build image (no volume mount!)"
@@ -84,9 +78,6 @@ pipeline {
                 
                 stage('ClamAV Malware Scan') {
                     agent any
-                    options {
-                        skipDefaultCheckout()
-                    }
                     steps {
                         script {
                             echo "🦠 Running ClamAV malware scan using shared volume..."
@@ -117,9 +108,6 @@ pipeline {
                 
                 stage('Composer Audit') {
                     agent any
-                    options {
-                        skipDefaultCheckout()
-                    }
                     steps {
                         script {
                             echo "🔍 Running composer audit INSIDE build image"
@@ -148,9 +136,6 @@ pipeline {
         
         stage('Build Production Image') {
             agent any
-            options {
-                skipDefaultCheckout()
-            }
             steps {
                 script {
                     def imageName = "${DOCKER_IMAGE}:${env.BUILD_TAG}"
@@ -174,9 +159,6 @@ pipeline {
         
         stage('Image Security Scan') {
             agent any
-            options {
-                skipDefaultCheckout()
-            }
             steps {
                 script {
                     echo "🔍 Scanning production image for vulnerabilities..."
@@ -208,9 +190,6 @@ pipeline {
         
         stage('Push to Docker Hub') {
             agent any
-            options {
-                skipDefaultCheckout()
-            }
             steps {
                 script {
                     withCredentials([usernamePassword(
@@ -232,9 +211,6 @@ pipeline {
         
         stage('Deploy to VPS') {
             agent any
-            options {
-                skipDefaultCheckout()
-            }
             steps {
                 script {
                     def deployTag = env.BUILD_TAG
