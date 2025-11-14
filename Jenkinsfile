@@ -62,24 +62,15 @@ pipeline {
                     agent any
                     steps {
                         script {
-                            echo "📊 Running SonarQube scan via container..."
+                            echo "📊 Running SonarQube scan using Jenkins plugin..."
                             
-                            try {
-                                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                                    sh """
-                                        docker exec sonarqube sonar-scanner \
-                                            -Dsonar.projectKey=bagisto \
-                                            -Dsonar.sources=/code/workspace/bagisto/app,/code/workspace/bagisto/packages/Webkul \
-                                            -Dsonar.exclusions=vendor/**,node_modules/**,storage/**,public/**,tests/** \
-                                            -Dsonar.host.url=http://localhost:9000 \
-                                            -Dsonar.token=${SONAR_TOKEN}
-                                    """
-                                }
-                                echo "✅ SonarQube scan completed"
-                            } catch (Exception e) {
-                                echo "⚠️ SonarQube scan failed: ${e.message}"
-                                // Don't fail the build, just warn
+                            def scannerHome = tool 'SonarScanner'
+                            
+                            withSonarQubeEnv('SonarQube') {
+                                sh "cd workspace && ${scannerHome}/bin/sonar-scanner"
                             }
+                            
+                            echo "✅ SonarQube scan completed"
                         }
                     }
                 }
